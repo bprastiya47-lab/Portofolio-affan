@@ -1,0 +1,6 @@
+{
+  "name": "FANZ_FIGHTERS — Aviation Photography Portfolio",
+  "description": "Interactive 3D aviation & rail photography portfolio of FANZ_FIGHTERS (@fanzfighters_pict) featuring a 3D cinematic fly-by intro, 360-degree curved gallery, and interactive 3D aircraft inspection.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

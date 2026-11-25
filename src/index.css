@@ -1,0 +1,336 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-display: "Big Shoulders Display", ui-sans-serif, sans-serif;
+  --font-sans: "Instrument Sans", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+:root {
+  /* 1 Warna Aksen: Merah Bara (#EF233C) di atas hitam obsidian hangat (#080507) */
+  --accent-cyan: #EF233C;
+  --accent-bright: #FF5A6E;
+  --accent-rgb: 239, 35, 60;
+
+  /* 5 Warna Netral (Kokpit & Landasan Malam) */
+  --neutral-950: #080507;
+  --neutral-900: #120A0D;
+  --neutral-800: #2B1218;
+  --neutral-400: #A8969B;
+  --neutral-100: #F6EEF0;
+
+  /* Skala Spasi 4/8px */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Dua Nilai Radius */
+  --radius-sharp: 4px;
+  --radius-pill: 9999px;
+
+  /* Skala Tipografi (minimum 12px) */
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-hero: clamp(40px, 5.4vw, 68px);
+
+  /* Kurva Gerak Kokpit */
+  --ease-cockpit: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Sisa kelas Tailwind sky-* otomatis menjadi merah bara di seluruh situs */
+:root {
+  --color-sky-300: #ff5a6e;
+  --color-sky-400: #ef233c;
+  --color-sky-500: #d90429;
+}
+
+html[data-mood="belial"] {
+  --accent-cyan: #EF233C;
+  --accent-bright: #FF5A6E;
+  --accent-rgb: 239, 35, 60;
+  --color-sky-300: #FF5A6E;
+  --color-sky-400: #EF233C;
+  --color-sky-500: #D90429;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: var(--neutral-950);
+    color: var(--neutral-100);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    overflow: hidden;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* Grain sensor tipis dan vignette kokpit */
+.cockpit-vignette {
+  background: radial-gradient(
+    ellipse 78% 72% at 50% 48%,
+    rgba(8, 5, 7, 0) 46%,
+    rgba(8, 5, 7, 0.56) 100%
+  );
+}
+
+.sensor-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.65'/%3E%3C/svg%3E");
+  opacity: 0.032;
+}
+
+@keyframes belialEmberShimmer {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scaleY(1);
+    opacity: 0.78;
+  }
+  50% {
+    transform: translate3d(0, -3px, 0) scaleY(1.03);
+    opacity: 1;
+  }
+}
+
+.belial-ember-wave {
+  animation: belialEmberShimmer 2.4s ease-in-out infinite;
+}
+
+/* Indikator scroll Hero */
+@keyframes heroScrollTick {
+  0% {
+    transform: translate3d(0, -100%, 0);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, 260%, 0);
+    opacity: 0;
+  }
+}
+
+.hero-scroll-tick {
+  animation: heroScrollTick 1.6s var(--ease-cockpit) infinite;
+}
+
+/* Transisi sinematik Crimson Warp / Camera Dive */
+@keyframes heroWarpIn {
+  from {
+    transform: scale(1.24);
+    opacity: 0;
+    filter: blur(6px);
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.hero-warp-in {
+  animation: heroWarpIn 640ms var(--ease-cockpit) both;
+}
+
+@keyframes galleryDiveIn {
+  from {
+    transform: scale(1.22);
+    opacity: 0;
+    filter: blur(6px);
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes galleryDiveOut {
+  from {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    transform: scale(1.3);
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+
+.gallery-dive-in {
+  animation: galleryDiveIn 640ms var(--ease-cockpit) both;
+}
+
+.gallery-dive-out {
+  animation: galleryDiveOut 620ms var(--ease-cockpit) both;
+}
+
+@keyframes warpFlash {
+  0% {
+    opacity: 0;
+  }
+  55% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.warp-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 52%,
+    rgba(255, 90, 110, 0.85) 0%,
+    rgba(239, 35, 60, 0.5) 28%,
+    rgba(29, 4, 8, 0.82) 70%,
+    #080507 100%
+  );
+  opacity: 0;
+  animation: warpFlash 1240ms var(--ease-cockpit) both;
+}
+
+@keyframes warpRaysOut {
+  from {
+    transform: scale(0.55);
+    opacity: 0;
+  }
+  45% {
+    opacity: 1;
+  }
+  to {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
+@keyframes warpRaysIn {
+  from {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+  45% {
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.55);
+    opacity: 0;
+  }
+}
+
+.warp-rays {
+  position: absolute;
+  inset: -20%;
+  background: repeating-conic-gradient(
+    from 0deg at 50% 52%,
+    rgba(239, 35, 60, 0.7) 0deg 0.35deg,
+    transparent 0.35deg 7.5deg
+  );
+  mask-image: radial-gradient(circle at 50% 52%, transparent 8%, #000 62%);
+  -webkit-mask-image: radial-gradient(circle at 50% 52%, transparent 8%, #000 62%);
+  opacity: 0;
+}
+
+.warp-rays-out {
+  animation: warpRaysOut 1240ms var(--ease-cockpit) both;
+}
+
+.warp-rays-in {
+  animation: warpRaysIn 1240ms var(--ease-cockpit) both;
+}
+
+@keyframes warpHudSweep {
+  0% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  35% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+
+.warp-hud-line {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  height: 1px;
+  background: #ef233c;
+  box-shadow: 0 0 10px rgba(239, 35, 60, 0.9);
+  transform-origin: 50% 50%;
+  opacity: 0;
+  animation: warpHudSweep 1100ms var(--ease-cockpit) both;
+}
+
+.warp-hud-line-top {
+  top: 18%;
+}
+
+.warp-hud-line-bottom {
+  bottom: 18%;
+  animation-delay: 80ms;
+}
+
+/* Scrollbar halus untuk modal */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--neutral-950);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--accent-rgb), 0.28);
+  border-radius: var(--radius-sharp);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--accent-rgb), 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+  .belial-ember-wave,
+  .hero-scroll-tick,
+  .hero-warp-in,
+  .gallery-dive-in,
+  .gallery-dive-out {
+    animation: none !important;
+  }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
