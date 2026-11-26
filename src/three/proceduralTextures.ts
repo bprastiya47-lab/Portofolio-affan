@@ -479,7 +479,7 @@ export function createDeckAlphaMask(): THREE.CanvasTexture {
 }
 
 export function createApronFloorTexture(): THREE.CanvasTexture {
-  const key = 'apron-floor-v3-crimson';
+  const key = 'apron-floor-v4-night';
   const cached = textureCache.get(key);
   if (cached) return cached;
 
@@ -488,35 +488,42 @@ export function createApronFloorTexture(): THREE.CanvasTexture {
   canvas.height = 1024;
   const ctx = canvas.getContext('2d')!;
 
-  // Obsidian merah marun yang menyatu dengan kabut cakrawala (tanpa garis potong kasar)
+  // Aspal apron malam: ungu-hitam yang menyatu dengan cakrawala
   const baseGrad = ctx.createRadialGradient(512, 512, 40, 512, 512, 512);
-  baseGrad.addColorStop(0, '#1A070C');
-  baseGrad.addColorStop(0.55, '#14060A');
-  baseGrad.addColorStop(1, '#1D0408');
+  baseGrad.addColorStop(0, '#120A14');
+  baseGrad.addColorStop(0.6, '#0D0810');
+  baseGrad.addColorStop(1, '#09060C');
   ctx.fillStyle = baseGrad;
   ctx.fillRect(0, 0, 1024, 1024);
 
-  // Cincin radar merah bara yang sangat halus
-  ctx.strokeStyle = 'rgba(239, 35, 60, 0.2)';
-  ctx.lineWidth = 1.5;
-  for (const r of [165, 315, 425]) {
+  // Sambungan pelat beton apron (kisi tipis)
+  ctx.strokeStyle = 'rgba(180, 163, 168, 0.07)';
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i <= 1024; i += 96) {
     ctx.beginPath();
-    ctx.arc(512, 512, r, 0, Math.PI * 2);
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, 1024);
+    ctx.moveTo(0, i);
+    ctx.lineTo(1024, i);
     ctx.stroke();
   }
 
-  // Compass degree ticks around gallery circumference
-  ctx.strokeStyle = 'rgba(255, 90, 110, 0.18)';
-  ctx.lineWidth = 1.5;
-  for (let deg = 0; deg < 360; deg += 15) {
-    const rad = (deg * Math.PI) / 180;
-    const inner = deg % 45 === 0 ? 395 : 412;
-    const outer = 425;
-    ctx.beginPath();
-    ctx.moveTo(512 + Math.cos(rad) * inner, 512 + Math.sin(rad) * inner);
-    ctx.lineTo(512 + Math.cos(rad) * outer, 512 + Math.sin(rad) * outer);
-    ctx.stroke();
-  }
+  // Garis masuk parkir pesawat (lead-in) kuning, putus-putus, melengkung ke arah karusel
+  ctx.strokeStyle = 'rgba(255, 176, 32, 0.34)';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([46, 30]);
+  ctx.beginPath();
+  ctx.arc(512, 410, 330, Math.PI * 0.18, Math.PI * 0.82);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Genangan cahaya merah di kaki dinding foto (pusat karusel berada ~4,8 m di belakang pusat lantai)
+  const pool = ctx.createRadialGradient(512, 410, 100, 512, 410, 215);
+  pool.addColorStop(0, 'rgba(239, 35, 60, 0)');
+  pool.addColorStop(0.55, 'rgba(239, 35, 60, 0.2)');
+  pool.addColorStop(1, 'rgba(239, 35, 60, 0)');
+  ctx.fillStyle = pool;
+  ctx.fillRect(0, 0, 1024, 1024);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;

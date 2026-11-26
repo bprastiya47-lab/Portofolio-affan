@@ -552,7 +552,7 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
         onPointerEnter={handleDockPointerEnter}
         onPointerMove={handleDockPointerMove}
         onPointerLeave={handleDockPointerLeave}
-        className="relative bg-[#090507]/90 backdrop-blur-2xl border border-red-500/30 shadow-[0_14px_40px_rgba(0,0,0,0.85)] rounded-full px-1.5 sm:px-2 py-1.5"
+        className="relative bg-[#090507]/90 backdrop-blur-2xl border border-[#EFE7E1]/12 shadow-[0_14px_40px_rgba(0,0,0,0.85)] rounded-[12px] px-1.5 sm:px-2 py-1.5"
         style={
           {
             '--glow-x': '50%',
@@ -563,7 +563,7 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
         {/* Cahaya radial aksen terklip di lapisan latar kapsul */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-full overflow-hidden"
+          className="pointer-events-none absolute inset-0 rounded-[10px] overflow-hidden"
         >
           <div
             className="absolute inset-0 transition-opacity duration-200"
@@ -596,7 +596,7 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
               <div
                 ref={pillRef}
                 aria-hidden="true"
-                className="pointer-events-none absolute top-0 bottom-0 left-0 rounded-full bg-[#EF233C]/30 border border-[#EF233C] shadow-[0_0_18px_rgba(239,35,60,0.55)]"
+                className="pointer-events-none absolute top-0 bottom-0 left-0 -skew-x-12 bg-[#EF233C] shadow-[0_8px_20px_rgba(239,35,60,0.32)]"
                 style={{ willChange: 'transform, width' }}
               />
 
@@ -622,9 +622,9 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
                       setFocusedId(id);
                       setHoveredUtility(null);
                     }}
-                    className={`relative z-10 min-h-[44px] min-w-[44px] inline-flex items-center justify-center sm:gap-2 px-2 sm:px-3.5 py-2 rounded-full font-mono text-xs tracking-[0.06em] sm:tracking-[0.08em] uppercase transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C] ${
+                    className={`relative z-10 min-h-[44px] min-w-[44px] inline-flex items-center justify-center sm:gap-2 px-2 sm:px-3.5 py-2 rounded-[8px] font-sans text-[13px] tracking-normal transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C] ${
                       isHighlighted
-                        ? 'text-[#F6EEF0] font-semibold'
+                        ? 'text-[#FFF6F2] font-semibold'
                         : isActive
                           ? 'text-[#F6EEF0]'
                           : 'text-[#A8969B] hover:text-[#F6EEF0]'
@@ -780,7 +780,7 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
                 onClick={onPrevFrame}
                 onPointerEnter={() => audioEngine.playDockHover()}
                 aria-label="Frame sebelumnya"
-                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-full font-mono text-xs tracking-[0.08em] uppercase text-[#F6EEF0] hover:bg-[#EF233C]/15 transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C]"
+                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-[8px] font-sans text-[13px] tracking-normal text-[#F6EEF0] hover:bg-[#EF233C]/15 transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C]"
               >
                 <IconPrev className="w-4 h-4 text-[#EF233C] shrink-0" />
                 <span className="hidden sm:inline">Sebelumnya</span>
@@ -798,7 +798,7 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
                 onClick={onNextFrame}
                 onPointerEnter={() => audioEngine.playDockHover()}
                 aria-label="Frame berikutnya"
-                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-full font-mono text-xs tracking-[0.08em] uppercase text-[#F6EEF0] hover:bg-[#EF233C]/15 transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C]"
+                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-[8px] font-sans text-[13px] tracking-normal text-[#F6EEF0] hover:bg-[#EF233C]/15 transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C]"
               >
                 <span className="hidden sm:inline">Berikutnya</span>
                 <IconNext className="w-4 h-4 text-[#EF233C] shrink-0" />
@@ -814,7 +814,7 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
                 }}
                 onPointerEnter={() => audioEngine.playDockHover()}
                 aria-label="Minta lisensi frame ini"
-                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-full font-mono text-xs tracking-[0.08em] uppercase text-[#F6EEF0] hover:bg-[#EF233C]/15 transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C]"
+                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-[8px] font-sans text-[13px] tracking-normal text-[#F6EEF0] hover:bg-[#EF233C]/15 transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C]"
               >
                 <IconLicense className="w-4 h-4 text-[#EF233C] shrink-0" />
                 <span className="hidden sm:inline">Lisensi</span>
@@ -828,7 +828,7 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
                 }}
                 onPointerEnter={() => audioEngine.playDockHover()}
                 aria-label="Buka foto utuh di lightbox"
-                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-full font-mono text-xs tracking-[0.08em] uppercase text-[#F6EEF0] hover:bg-[#EF233C]/15 transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C]"
+                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-[8px] font-sans text-[13px] tracking-normal text-[#F6EEF0] hover:bg-[#EF233C]/15 transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C]"
               >
                 <IconExpand className="w-4 h-4 text-[#EF233C] shrink-0" />
                 <span className="hidden sm:inline">Lightbox</span>
@@ -842,7 +842,7 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
                 }}
                 onPointerEnter={() => audioEngine.playDockHover()}
                 aria-label="Kembali ke galeri"
-                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-4 py-2 rounded-full font-mono text-xs font-semibold tracking-[0.08em] uppercase text-[#080507] bg-[#EF233C] hover:bg-[#FF5A6E] active:bg-[#D90429] transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-4 py-2 rounded-[8px] font-sans text-[13px] font-semibold tracking-normal text-[#080507] bg-[#EF233C] hover:bg-[#FF5A6E] active:bg-[#D90429] transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <IconBack className="w-4 h-4 shrink-0" />
                 <span className="hidden sm:inline">Kembali</span>
@@ -872,7 +872,7 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
                   onCloseModal();
                 }}
                 aria-label="Tutup panel"
-                className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-full font-mono text-xs font-semibold tracking-[0.08em] uppercase text-[#080507] bg-[#EF233C] hover:bg-[#FF5A6E] active:bg-[#D90429] transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-full font-sans text-[13px] font-semibold tracking-normal text-[#080507] bg-[#EF233C] hover:bg-[#FF5A6E] active:bg-[#D90429] transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <IconClose className="w-4 h-4 shrink-0" />
                 <span>Tutup</span>

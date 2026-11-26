@@ -23,6 +23,21 @@ const SKY_FRAGMENT_SHADER = /* glsl */ `
     return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
   }
 
+  float vnoise(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i);
+    float b = hash(i + vec3(1.0, 0.0, 0.0));
+    float c = hash(i + vec3(0.0, 1.0, 0.0));
+    float d = hash(i + vec3(1.0, 1.0, 0.0));
+    float e = hash(i + vec3(0.0, 0.0, 1.0));
+    float g = hash(i + vec3(1.0, 0.0, 1.0));
+    float h = hash(i + vec3(0.0, 1.0, 1.0));
+    float k = hash(i + vec3(1.0, 1.0, 1.0));
+    return mix(mix(mix(a, b, f.x), mix(c, d, f.x), f.y), mix(mix(e, g, f.x), mix(h, k, f.x), f.y), f.z);
+  }
+
   vec3 skyColor(
     vec3 dir,
     vec3 zenithCol,
@@ -71,26 +86,23 @@ const SKY_FRAGMENT_SHADER = /* glsl */ `
       0.5
     );
 
-    // Galeri: Obsidian Crimson Eclipse
-    // zenith #050304 -> cakrawala #1D0408 -> semburat bara di arah matahari terbenam
+    // Galeri: langit malam bandara di bawah nebula galaksi gelap
+    // zenith ungu-hitam -> cakrawala merah bara; tanpa cincin atau lingkaran dekoratif
     vec3 villain = skyColor(
       dir,
-      vec3(0.0196, 0.0118, 0.0157),
-      vec3(0.0627, 0.0118, 0.0235),
-      vec3(0.1137, 0.0157, 0.0314),
-      vec3(0.42, 0.045, 0.085),
-      vec3(0.040, 0.008, 0.016),
-      vec3(1.0, 0.35, 0.28),
-      0.42
+      vec3(0.012, 0.010, 0.026),
+      vec3(0.040, 0.018, 0.058),
+      vec3(0.150, 0.030, 0.062),
+      vec3(0.70, 0.18, 0.10),
+      vec3(0.026, 0.011, 0.022),
+      vec3(1.0, 0.86, 0.80),
+      0.85
     );
 
-    // Cincin gerhana tipis gelap bertepi bara di langit
-    vec3 eclipseDir = normalize(vec3(-0.55, 0.34, -0.83));
-    float eclipseAngle = acos(clamp(dot(dir, eclipseDir), -1.0, 1.0));
-    float disc = smoothstep(0.17, 0.16, eclipseAngle);
-    float corona = exp(-pow((eclipseAngle - 0.17) * 14.0, 2.0));
-    villain = mix(villain, vec3(0.012, 0.004, 0.008), disc * 0.92);
-    villain += vec3(0.85, 0.09, 0.15) * corona * 0.28;
+    float n1 = vnoise(dir * 3.1 + vec3(uTime * 0.008, 0.0, 0.0));
+    float n2 = vnoise(dir * 7.4 - vec3(0.0, uTime * 0.012, 0.0));
+    float neb = smoothstep(0.5, 0.92, n1 * 0.65 + n2 * 0.35) * smoothstep(0.06, 0.5, dir.y);
+    villain += mix(vec3(0.30, 0.035, 0.11), vec3(0.17, 0.06, 0.34), n2) * neb * 0.5;
 
     gl_FragColor = vec4(mix(intro, villain, uMix), 1.0);
   }
@@ -307,7 +319,7 @@ export const AtmosphericSky: React.FC<{
               }
               color={villain ? '#FFFFFF' : c.tint}
               transparent
-              opacity={villain ? Math.min(0.9, c.opacity * 3.4) : c.opacity}
+              opacity={villain ? Math.min(0.5, c.opacity * 1.3) : c.opacity}
               depthWrite={false}
             />
           </mesh>

@@ -7,6 +7,7 @@ import { detectSoftwareWebGL, supportsWebGL } from '../../utils/webglDetect';
 import { IntroFlybyScene } from './IntroFlybyScene';
 import { GalleryCylinder, GalleryLoadProgress } from './GalleryCylinder';
 import { AtmosphericSky } from './AtmosphericSky';
+import { AirfieldLights } from './AirfieldLights';
 
 interface SceneCanvasProps {
   items: PortfolioItem[];
@@ -140,27 +141,28 @@ export const SceneCanvas: React.FC<SceneCanvasProps> = ({
           });
         }}
       >
-        <color attach="background" args={[villain ? '#0A0306' : '#091424']} />
-        <fogExp2 attach="fog" args={[villain ? '#1D0408' : '#15243A', villain ? 0.021 : 0.015]} />
+        <color attach="background" args={[villain ? '#07060A' : '#091424']} />
+        <fogExp2 attach="fog" args={[villain ? '#12060E' : '#15243A', villain ? 0.016 : 0.015]} />
 
         <StudioEnvironment intensity={villain ? 0.3 : 1} />
         <AtmosphericSky isSoftwareGl={isSoftwareGl} reducedMotion={reducedMotion} villain={villain} />
 
         {villain ? (
           <>
-            {/* Rig pencahayaan villain: rim-light merah dari belakang, pantulan marun dari lantai */}
-            <hemisphereLight args={['#8A1426', '#1A050A', 0.62]} />
+            {/* Rig villain: sodium hangat dari depan (lampu apron), rim merah dari belakang, genangan merah di lantai */}
+            <hemisphereLight args={['#4A1830', '#12060A', 0.55]} />
             <directionalLight
               position={[14, 18, 10]}
-              intensity={1.35}
-              color="#FFD9D2"
+              intensity={1.3}
+              color="#FFC999"
               castShadow={!isSoftwareGl}
               shadow-mapSize={[1024, 1024]}
               shadow-bias={-0.0005}
             />
-            <directionalLight position={[-12, 10, -14]} intensity={1.5} color="#EF233C" />
-            <pointLight position={[0, 4.2, 2.5]} intensity={0.9} color="#FF5A6E" distance={22} />
-            <pointLight position={[0, 0.4, -3]} intensity={1.6} color="#D90429" distance={16} />
+            <directionalLight position={[-12, 10, -14]} intensity={1.6} color="#EF233C" />
+            <pointLight position={[0, 4.2, 2.5]} intensity={0.8} color="#FFB36B" distance={22} />
+            <pointLight position={[0, 0.4, -3]} intensity={1.5} color="#D90429" distance={16} />
+            <AirfieldLights reducedMotion={reducedMotion} />
           </>
         ) : (
           <>

@@ -7,7 +7,7 @@ import { DockTriggerOrigin, NavigationDock } from './components/ui/NavigationDoc
 import { InspectionDock } from './components/ui/InspectionDock';
 import { SplitFlapHero } from './components/ui/SplitFlapHero';
 import { CockpitCursor } from './components/ui/CockpitCursor';
-import { CrimsonWarp } from './components/ui/CrimsonWarp';
+import { ApertureMode, ApertureTransition } from './components/ui/ApertureTransition';
 import { HeroProfile } from './components/hero/HeroProfile';
 import {
   ContactPrefill,
@@ -102,12 +102,13 @@ export default function App() {
   });
   const [progressVisible, setProgressVisible] = useState(true);
 
-  const [warp, setWarp] = useState<{ dir: 'down' | 'up'; stage: 'out' | 'in' } | null>(null);
+  const [aperture, setAperture] = useState<{ mode: ApertureMode; key: number }>({ mode: 'idle', key: 0 });
+  const [heroEntry, setHeroEntry] = useState<'fresh' | 'return'>('fresh');
+  const [heroEnterSignal, setHeroEnterSignal] = useState(0);
 
   const headingFloatRef = useRef(0);
   const prevModalOpenRef = useRef(false);
-  const warpBusyRef = useRef(false);
-  const warpTimersRef = useRef<number[]>([]);
+  const apertureBusyRef = useRef(false);
 
   const selectedIndex = useMemo(
     () => (selectedId ? items.findIndex((i) => i.id === selectedId) : -1),
@@ -265,112 +266,48 @@ export default function App() {
   }, [items]);
 
   const handleIntroComplete = useCallback(() => {
+    setHeroEntry('fresh');
     setActiveTab('hero');
     setPhase('hero');
   }, []);
 
-  // Crimson Warp / Camera Dive: fase keluar 620ms, commit pergantian fase, lalu fase masuk 640ms
-  const clearWarp = useCallback(() => {
-    warpTimersRef.current.forEach((id) => window.clearTimeout(id));
-    warpTimersRef.current = [];
-    warpBusyRef.current = false;
-    setWarp(null);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      warpTimersRef.current.forEach((id) => window.clearTimeout(id));
-      warpTimersRef.current = [];
-    };
-  }, []);
-
-  const runWarp = useCallback(
-    (dir: 'down' | 'up', commit: () => void) => {
-      if (warpBusyRef.current) return;
-      if (reducedMotion) {
-        commit();
-        return;
-      }
-      warpBusyRef.current = true;
-      setWarp({ dir, stage: 'out' });
-      audioEngine.playModalOpen();
-      const commitTimer = window.setTimeout(() => {
-        commit();
-        setWarp({ dir, stage: 'in' });
-      }, 620);
-      const doneTimer = window.setTimeout(() => {
-        warpBusyRef.current = false;
-        setWarp(null);
-      }, 1260);
-      warpTimersRef.current.push(commitTimer, doneTimer);
-    },
-    [reducedMotion]
-  );
-
+  // Hero -> Galeri: hero sendiri sudah menggulir sampai gelap (scrub); di sini hanya pergantian fase,
+  // lalu diafragma membuka dari tertutup untuk mengungkap galeri.
   const commitEnterGallery = useCallback(() => {
     setHoveredItem(null);
     setBelialState({ progress: 0, belialMood: false, overSilhouette: false });
     setActiveTab('gallery');
     setPhase('gallery');
+    setAperture((a) => ({ mode: reducedMotion ? 'idle' : 'open', key: a.key + 1 }));
+  }, [reducedMotion]);
+
+  const handleEnterGallery = commitEnterGallery;
+
+  // Galeri -> Hero: diafragma menutup, ganti fase, hero muncul dari posisi tergulir lalu mundur ke awal
+  const startReturnToHero = useCallback(() => {
+    if (apertureBusyRef.current) return;
+    setHoveredItem(null);
+    setActiveTab('hero');
+    if (reducedMotion) {
+      setHeroEntry('fresh');
+      setPhase('hero');
+      return;
+    }
+    apertureBusyRef.current = true;
+    setAperture((a) => ({ mode: 'close', key: a.key + 1 }));
+  }, [reducedMotion]);
+
+  const handleApertureClosed = useCallback(() => {
+    setHeroEntry('return');
+    setActiveTab('hero');
+    setPhase('hero');
+    setAperture((a) => ({ mode: 'open', key: a.key + 1 }));
   }, []);
 
-  const handleEnterGallery = useCallback(() => {
-    runWarp('down', commitEnterGallery);
-  }, [runWarp, commitEnterGallery]);
-
-  // Scroll-driven: roda mouse / geser ke atas / panah bawah di Hero masuk ke Galeri 3D
-  useEffect(() => {
-    if (phase !== 'hero' || isModalTab || indexOpen) return;
-
-    let acc = 0;
-    let lastWheelAt = 0;
-    let touchStartY: number | null = null;
-
-    const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || warpBusyRef.current) return;
-      const now = performance.now();
-      if (now - lastWheelAt > 380) acc = 0;
-      lastWheelAt = now;
-      acc += e.deltaY;
-      if (acc > 60) {
-        acc = 0;
-        handleEnterGallery();
-      }
-    };
-
-    const onTouchStart = (e: TouchEvent) => {
-      touchStartY = e.touches[0]?.clientY ?? null;
-    };
-
-    const onTouchEnd = (e: TouchEvent) => {
-      if (touchStartY === null || warpBusyRef.current) return;
-      const endY = e.changedTouches[0]?.clientY ?? touchStartY;
-      const dy = touchStartY - endY;
-      touchStartY = null;
-      if (dy > 64) handleEnterGallery();
-    };
-
-    const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) {
-        return;
-      }
-      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
-        handleEnterGallery();
-      }
-    };
-
-    window.addEventListener('wheel', onWheel, { passive: true });
-    window.addEventListener('touchstart', onTouchStart, { passive: true });
-    window.addEventListener('touchend', onTouchEnd, { passive: true });
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('wheel', onWheel);
-      window.removeEventListener('touchstart', onTouchStart);
-      window.removeEventListener('touchend', onTouchEnd);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [phase, isModalTab, indexOpen, handleEnterGallery]);
+  const handleApertureOpened = useCallback(() => {
+    apertureBusyRef.current = false;
+    setAperture((a) => ({ mode: 'idle', key: a.key }));
+  }, []);
 
   // Failsafe 8.0s agar intro tetap masuk hero profil bila perangkat sangat lambat, tanpa memotong animasi 3.6s
   useEffect(() => {
@@ -383,7 +320,9 @@ export default function App() {
   }, [phase]);
 
   const handleReplayIntro = useCallback(() => {
-    clearWarp();
+    apertureBusyRef.current = false;
+    setAperture((a) => ({ mode: 'idle', key: a.key }));
+    setHeroEntry('fresh');
     setLightboxOpen(false);
     setIndexOpen(false);
     setSelectedId(null);
@@ -392,7 +331,7 @@ export default function App() {
     setActiveTab('hero');
     syncHashForFrame(null, 'replace');
     setPhase('intro');
-  }, [syncHashForFrame, clearWarp]);
+  }, [syncHashForFrame]);
 
   const handleSelectItem = useCallback(
     (id: string) => {
@@ -438,28 +377,29 @@ export default function App() {
 
   const handleSelectDockTab = useCallback(
     (tab: NavTab, origin?: DockTriggerOrigin) => {
-      if (warpBusyRef.current) return;
+      if (apertureBusyRef.current) return;
       setIndexOpen(false);
       if (tab === 'hero') {
-        // Dari Galeri murni (tanpa modal/inspeksi): transisi balik Crimson Warp menuju Hero Profil
+        // Dari Galeri murni (tanpa modal/inspeksi): diafragma menutup lalu hero muncul kembali
         if (phase === 'gallery' && !selectedId && !isModalTab && !lightboxOpen) {
-          setHoveredItem(null);
-          setActiveTab('hero');
-          runWarp('up', () => {
-            setActiveTab('hero');
-            setPhase('hero');
-          });
+          startReturnToHero();
           return;
         }
         setLightboxOpen(false);
         setSelectedId(null);
         setHoveredItem(null);
         syncHashForFrame(null, 'replace');
+        setHeroEntry('fresh');
         setActiveTab('hero');
         setPhase('hero');
         return;
       }
       if (tab === 'gallery') {
+        if (phase === 'hero' && !isModalTab) {
+          // Hero menggulir sendiri sampai gelap, lalu memanggil handleEnterGallery
+          setHeroEnterSignal((n) => n + 1);
+          return;
+        }
         setPhase('gallery');
         setActiveTab('gallery');
         setLightboxOpen(false);
@@ -471,7 +411,7 @@ export default function App() {
       setHoveredItem(null);
       setActiveTab(tab);
     },
-    [syncHashForFrame, phase, selectedId, isModalTab, lightboxOpen, runWarp]
+    [syncHashForFrame, phase, selectedId, isModalTab, lightboxOpen, startReturnToHero]
   );
 
   const handleCloseModal = useCallback(() => {
@@ -586,15 +526,6 @@ export default function App() {
       </div>
 
       {/* Kanvas WebGL Stratosfer & Karusel Galeri 3D */}
-      <div
-        className={`absolute inset-0 ${
-          warp?.dir === 'down' && warp.stage === 'in'
-            ? 'gallery-dive-in'
-            : warp?.dir === 'up' && warp.stage === 'out'
-              ? 'gallery-dive-out'
-              : ''
-        }`}
-      >
       <SceneCanvas
         items={items}
         phase={phase}
@@ -610,26 +541,27 @@ export default function App() {
         onLoadProgress={handleLoadProgress}
         onSceneReady={handleSceneReady}
       />
-      </div>
 
       {/* Adegan Hero Profil + Transformasi Interaktif Belial (Setelah Intro, Sebelum Galeri) */}
       <HeroProfile
         active={phase === 'hero'}
         tabVisible={tabVisible}
         reducedMotion={reducedMotion}
-        warp={
-          warp?.dir === 'down' && warp.stage === 'out'
-            ? 'out'
-            : warp?.dir === 'up' && warp.stage === 'in'
-              ? 'in'
-              : 'idle'
-        }
+        entry={heroEntry}
+        enterSignal={heroEnterSignal}
+        inputLocked={isModalTab || lightboxOpen || indexOpen}
         onEnterGallery={handleEnterGallery}
         onBelialStateChange={setBelialState}
       />
 
-      {/* Transisi sinematik Crimson Warp antar-fase (Hero <-> Galeri) */}
-      <CrimsonWarp stage={warp?.stage ?? null} reducedMotion={reducedMotion} />
+      {/* Diafragma kamera: pembuka galeri dan penutup saat kembali ke beranda */}
+      <ApertureTransition
+        mode={aperture.mode}
+        runKey={aperture.key}
+        reducedMotion={reducedMotion}
+        onClosed={handleApertureClosed}
+        onOpened={handleApertureOpened}
+      />
 
       {/* Vignette Kokpit Gelap & Grain Sensor Tipis */}
       <div className="pointer-events-none fixed inset-0 z-10 cockpit-vignette" aria-hidden="true" />
@@ -699,11 +631,11 @@ export default function App() {
 
       {/* Panduan Interaksi Ringkas di Atas Dock */}
       {phase === 'gallery' && !selectedItem && !isModalTab && !indexOpen && (
-        <p className="fixed bottom-[82px] sm:bottom-[86px] left-1/2 -translate-x-1/2 z-20 pointer-events-none font-mono text-xs tracking-[0.1em] text-[#A8969B] uppercase text-center max-w-[calc(100vw-24px)] px-3">
+        <p className="fixed bottom-[82px] sm:bottom-[86px] left-1/2 -translate-x-1/2 z-20 pointer-events-none font-sans text-[13px] text-[#B4A3A8] text-center max-w-[calc(100vw-24px)] px-3">
           <span className="hidden sm:inline">
-            Seret atau gulir untuk putar 360° · Klik frame untuk inspeksi 3D
+            Seret atau gulir untuk memutar karusel. Klik sebuah frame untuk inspeksi 3D.
           </span>
-          <span className="sm:hidden">Geser untuk putar · Ketuk frame untuk detail</span>
+          <span className="sm:hidden">Geser untuk memutar. Ketuk frame untuk detail.</span>
         </p>
       )}
 

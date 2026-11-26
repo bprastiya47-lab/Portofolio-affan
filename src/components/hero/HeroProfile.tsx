@@ -1,30 +1,34 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { audioEngine } from '../../audio/audioEngine';
+import belialFormImg from '../../assets/hero/berial2-removebg-preview.png';
 import { IconInstagram, IconNext, IconTransform } from '../ui/CockpitIcons';
-import { SplitFlapHero } from '../ui/SplitFlapHero';
 import {
-  BelialBackEffects,
-  BelialCityCracks,
+  BelialAura,
   BelialEmberCanvas,
-  BelialLayout,
   BelialMorphStage,
-  BoxPx,
-  MorphOrigin,
+  BoxSize,
+  EmberZone,
+  computeBelialPlacement,
 } from './BelialLayers';
-import { HERO_ASSETS, OWNER_IDENTITY } from './heroAnchors';
-
-// Rasio kanvas figur asli (foto 1061x1889)
-const FIG_W = 1061;
-const FIG_H = 1889;
-// Tinggi Belial relatif terhadap tinggi sosok asli (kaki sejajar trotoar)
-const BELIAL_HEIGHT_RATIO = 1.04;
-const DEFAULT_ORIGIN: MorphOrigin = { x: 0.5, y: 0.4 };
+import {
+  AlphaBounds,
+  BELIAL_FALLBACK_BOUNDS,
+  HERO_ANCHORS,
+  HERO_ASSETS,
+  HUMAN_FALLBACK_BOUNDS,
+  OWNER_IDENTITY,
+} from './heroAnchors';
 
 interface HeroProfileProps {
   active: boolean;
   tabVisible: boolean;
   reducedMotion: boolean;
-  warp?: 'idle' | 'out' | 'in';
+  /** 'return': datang dari galeri, mulai dari posisi tergulir penuh lalu mundur ke awal */
+  entry: 'fresh' | 'return';
+  /** Naik 1 setiap ada permintaan masuk galeri dari luar (tab Galeri di dock) */
+  enterSignal: number;
+  /** True saat modal atau indeks terbuka: gulir dan papan ketik diabaikan */
+  inputLocked: boolean;
   onEnterGallery: () => void;
   onBelialStateChange: (state: {
     progress: number;
@@ -33,47 +37,62 @@ interface HeroProfileProps {
   }) => void;
 }
 
-interface AlphaBitmapCache {
+interface AlphaCache {
   width: number;
   height: number;
   data: Uint8ClampedArray;
+  bounds: AlphaBounds | null;
 }
 
-interface AlphaBounds {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-}
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+const smooth = (a: number, b: number, x: number) => {
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+};
 
-interface BelialMap {
-  leftU: number;
-  topU: number;
-  scale: number;
-  cache: AlphaBitmapCache;
-}
-
-function loadAlphaCache(url: string): Promise<AlphaBitmapCache | null> {
+/** Memuat gambar, menyimpan kanal alpha (maks 640px) untuk hit-test, dan mengukur kotak tubuhnya */
+function loadAlphaCache(url: string): Promise<AlphaCache | null> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      if (img.naturalWidth === 0 || img.naturalHeight === 0) {
-        resolve(null);
-        return;
-      }
-      const offscreen = document.createElement('canvas');
-      offscreen.width = img.naturalWidth;
-      offscreen.height = img.naturalHeight;
-      const ctx = offscreen.getContext('2d', { willReadFrequently: true });
-      if (!ctx) {
-        resolve(null);
-        return;
-      }
-      ctx.drawImage(img, 0, 0);
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      if (!w || !h) return resolve(null);
+      const scale = Math.min(1, 640 / Math.max(w, h));
+      const cw = Math.max(1, Math.round(w * scale));
+      const ch = Math.max(1, Math.round(h * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return resolve(null);
       try {
-        const imgData = ctx.getImageData(0, 0, offscreen.width, offscreen.height);
-        resolve({ width: offscreen.width, height: offscreen.height, data: imgData.data });
+        ctx.drawImage(img, 0, 0, cw, ch);
+        const data = ctx.getImageData(0, 0, cw, ch).data;
+        let minX = cw;
+        let maxX = -1;
+        let minY = ch;
+        let maxY = -1;
+        for (let y = 0; y < ch; y++) {
+          for (let x = 0; x < cw; x++) {
+            if (data[(y * cw + x) * 4 + 3] > 24) {
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        resolve({
+          width: cw,
+          height: ch,
+          data,
+          bounds:
+            maxX < 0
+              ? null
+              : { minX: minX / cw, maxX: (maxX + 1) / cw, minY: minY / ch, maxY: (maxY + 1) / ch },
+        });
       } catch {
         resolve(null);
       }
@@ -83,113 +102,161 @@ function loadAlphaCache(url: string): Promise<AlphaBitmapCache | null> {
   });
 }
 
-function alphaBounds(cache: AlphaBitmapCache, threshold = 24): AlphaBounds | null {
-  let x0 = cache.width;
-  let y0 = cache.height;
-  let x1 = -1;
-  let y1 = -1;
-  for (let y = 0; y < cache.height; y++) {
-    const row = y * cache.width;
-    for (let x = 0; x < cache.width; x++) {
-      if (cache.data[(row + x) * 4 + 3] > threshold) {
-        if (x < x0) x0 = x;
-        if (x > x1) x1 = x;
-        if (y < y0) y0 = y;
-        if (y > y1) y1 = y;
-      }
-    }
-  }
-  if (x1 < 0 || y1 < 0) return null;
-  return { x0, y0, x1: x1 + 1, y1: y1 + 1 };
+function alphaAt(cache: AlphaCache | null, u: number, v: number): boolean {
+  if (!cache || u < 0 || u > 1 || v < 0 || v > 1) return false;
+  const px = Math.min(cache.width - 1, Math.floor(u * cache.width));
+  const py = Math.min(cache.height - 1, Math.floor(v * cache.height));
+  return cache.data[(py * cache.width + px) * 4 + 3] > 24;
 }
 
-const CITY_BOKEH_LIGHTS = [
-  { x: '11%', y: '44%', size: 12, delay: '0s' },
-  { x: '18%', y: '51%', size: 16, delay: '0.2s' },
-  { x: '27%', y: '47%', size: 10, delay: '0.4s' },
-  { x: '36%', y: '53%', size: 14, delay: '0.1s' },
-  { x: '45%', y: '46%', size: 11, delay: '0.35s' },
-  { x: '82%', y: '48%', size: 14, delay: '0.25s' },
-  { x: '91%', y: '43%', size: 11, delay: '0.5s' },
+/* ------------------------------------------------------------------ */
+/* Lapisan depan: tiang dan kawat listrik atas (LAA) jalur kereta       */
+/* ------------------------------------------------------------------ */
+
+const MastLattice: React.FC<{ className: string }> = ({ className }) => (
+  <svg aria-hidden="true" viewBox="0 0 40 900" preserveAspectRatio="none" className={className}>
+    <g fill="none" stroke="#040205" strokeLinejoin="round">
+      <path d="M 7 0 L 7 900 M 33 0 L 33 900" strokeWidth="5" />
+      <path
+        d="M 7 20 L 33 70 L 7 120 L 33 170 L 7 220 L 33 270 L 7 320 L 33 370 L 7 420 L 33 470 L 7 520 L 33 570 L 7 620 L 33 670 L 7 720 L 33 770 L 7 820 L 33 870"
+        strokeWidth="2.4"
+      />
+    </g>
+    <path d="M 7 0 L 7 900" fill="none" stroke="rgba(239,35,60,0.28)" strokeWidth="1" />
+  </svg>
+);
+
+/**
+ * Dua tiang kisi di tepi layar dan kawat pembawa + kawat kontak yang melengkung di antaranya.
+ * Hanya menempati pita tipis di bagian atas agar judul dan sosok tetap bersih.
+ */
+const ForegroundRig: React.FC = () => {
+  const droppers: string[] = [];
+  for (let i = 1; i < 24; i++) {
+    const t = i / 24;
+    const x = 60 + t * 1480;
+    const sag = 4 * t * (1 - t);
+    const y1 = 84 + sag * 86;
+    droppers.push(`M ${x.toFixed(1)} ${y1.toFixed(1)} L ${x.toFixed(1)} ${(y1 + 20 + sag * 6).toFixed(1)}`);
+  }
+  return (
+    <>
+      <MastLattice className="absolute left-[1.2%] top-0 h-full w-8 md:w-10" />
+      <MastLattice className="absolute right-[1.2%] top-0 h-full w-8 md:w-10" />
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 1600 300"
+        preserveAspectRatio="none"
+        className="absolute left-0 top-0 w-full h-[26%]"
+      >
+        <g fill="none" stroke="#040205" strokeLinecap="round">
+          <path d="M 18 78 L 150 78 M 1450 78 L 1582 78" strokeWidth="6" />
+          <path d="M 60 78 L 60 98 M 110 78 L 110 98 M 1490 78 L 1490 98 M 1540 78 L 1540 98" strokeWidth="4" />
+          <path d="M 60 84 Q 800 170 1540 84" strokeWidth="3.2" />
+          <path d="M 60 104 Q 800 194 1540 104" strokeWidth="2.4" />
+          <path d={droppers.join(' ')} strokeWidth="1.4" />
+        </g>
+        <path d="M 60 82 Q 800 168 1540 82" fill="none" stroke="rgba(239,35,60,0.3)" strokeWidth="1" />
+      </svg>
+    </>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+
+const CITY_LIGHTS = [
+  { x: '9%', y: '47%', size: 14, delay: 0 },
+  { x: '16%', y: '53%', size: 10, delay: 1 },
+  { x: '23%', y: '49%', size: 18, delay: 2 },
+  { x: '33%', y: '55%', size: 11, delay: 3 },
+  { x: '44%', y: '50%', size: 13, delay: 4 },
+  { x: '56%', y: '52%', size: 9, delay: 5 },
+  { x: '86%', y: '51%', size: 14, delay: 6 },
 ] as const;
 
 export const HeroProfile: React.FC<HeroProfileProps> = ({
   active,
   tabVisible,
   reducedMotion,
-  warp = 'idle',
+  entry,
+  enterSignal,
+  inputLocked,
   onEnterGallery,
   onBelialStateChange,
 }) => {
-  const stageRef = useRef<HTMLDivElement>(null);
   const figureBoxRef = useRef<HTMLDivElement>(null);
-  const alphaCacheRef = useRef<AlphaBitmapCache | null>(null);
-  const belialMapRef = useRef<BelialMap | null>(null);
-  const hoveredRef = useRef(false);
+  const humanCacheRef = useRef<AlphaCache | null>(null);
+  const belialCacheRef = useRef<AlphaCache | null>(null);
 
-  const [hoveredSilhouette, setHoveredSilhouette] = useState(false);
-  const [lockedBelial, setLockedBelial] = useState(false);
+  const [box, setBox] = useState<BoxSize>({ w: 0, h: 0 });
+  const [emberZone, setEmberZone] = useState<EmberZone | null>(null);
+  const [humanBounds, setHumanBounds] = useState<AlphaBounds>(HUMAN_FALLBACK_BOUNDS);
+  const [belialBounds, setBelialBounds] = useState<AlphaBounds>(BELIAL_FALLBACK_BOUNDS);
+
+  const [hovering, setHovering] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [lens, setLens] = useState<{ x: number; y: number } | null>(null);
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
-  const [origin, setOrigin] = useState<MorphOrigin>(DEFAULT_ORIGIN);
-  const [boxPx, setBoxPx] = useState<BoxPx>({ w: 0, h: 0 });
-  const [belialLayout, setBelialLayout] = useState<BelialLayout | null>(null);
+  const [scroll, setScroll] = useState(0);
 
+  // --- refs untuk loop animasi (hindari closure basi)
   const progressRef = useRef(0);
   const velocityRef = useRef(0);
   const prevMoodRef = useRef(false);
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  const lensRef = useRef<{ x: number; y: number } | null>(null);
+  const targetProgressRef = useRef(0);
+  const progressRafRef = useRef(0);
 
-  const targetProgress = hoveredSilhouette || lockedBelial ? 1 : 0;
+  const scrollRef = useRef(0);
+  const scrollTargetRef = useRef(0);
+  const scrollRafRef = useRef(0);
+  const committedRef = useRef(false);
+  const lastInputRef = useRef(0);
+  const snapTimerRef = useRef(0);
+  const downRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Muat alpha channel cutout sosok & gambar Belial ke kanvas offscreen sekali saja,
-  // lalu hitung penempatan Belial agar kakinya sejajar dengan kaki sosok asli
+  const targetProgress = hovering || locked ? 1 : 0;
+  targetProgressRef.current = targetProgress;
+
+  /* ---- memuat alpha sosok & Belial sekali ---- */
   useEffect(() => {
     let cancelled = false;
-
-    Promise.all([
-      loadAlphaCache(HERO_ASSETS.figureCutoutUrl),
-      loadAlphaCache(HERO_ASSETS.belialFormUrl),
-    ]).then(([human, belial]) => {
-      if (cancelled) return;
-      alphaCacheRef.current = human;
-      if (!human || !belial) return;
-
-      const fb = alphaBounds(human);
-      const bb = alphaBounds(belial);
-      if (!fb || !bb) return;
-
-      const figHeightU = ((fb.y1 - fb.y0) / human.height) * FIG_H;
-      const scale = (BELIAL_HEIGHT_RATIO * figHeightU) / (bb.y1 - bb.y0);
-      const feetXU = (((fb.x0 + fb.x1) / 2) / human.width) * FIG_W;
-      const feetYU = (fb.y1 / human.height) * FIG_H;
-      const leftU = feetXU - ((bb.x0 + bb.x1) / 2) * scale;
-      const topU = feetYU - bb.y1 * scale;
-
-      belialMapRef.current = { leftU, topU, scale, cache: belial };
-      setBelialLayout({
-        leftPct: (leftU / FIG_W) * 100,
-        topPct: (topU / FIG_H) * 100,
-        widthPct: ((belial.width * scale) / FIG_W) * 100,
-        heightPct: ((belial.height * scale) / FIG_H) * 100,
-      });
+    void loadAlphaCache(HERO_ASSETS.figureCutoutUrl).then((c) => {
+      if (cancelled || !c) return;
+      humanCacheRef.current = c;
+      if (c.bounds) setHumanBounds(c.bounds);
     });
-
+    void loadAlphaCache(belialFormImg).then((c) => {
+      if (cancelled || !c) return;
+      belialCacheRef.current = c;
+      if (c.bounds) setBelialBounds(c.bounds);
+    });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Ukur kotak figur agar radial mask morph memakai piksel yang tepat
+  /* ---- ukuran kotak figur & zona bara api ---- */
   useEffect(() => {
     if (!active) return;
-    const box = figureBoxRef.current;
-    if (!box) return;
+    const el = figureBoxRef.current;
+    if (!el) return;
     const measure = () => {
-      setBoxPx({ w: box.offsetWidth, h: box.offsetHeight });
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return;
+      setBox({ w: r.width, h: r.height });
+      setEmberZone({
+        cx: r.left + r.width / 2,
+        halfWidth: r.width * 0.3,
+        floorY: r.bottom - r.height * 0.05,
+        bodyHeight: r.height * 0.8,
+      });
     };
     measure();
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
-    ro?.observe(box);
+    ro?.observe(el);
     window.addEventListener('resize', measure);
     return () => {
       ro?.disconnect();
@@ -197,67 +264,86 @@ export const HeroProfile: React.FC<HeroProfileProps> = ({
     };
   }, [active]);
 
-  // Reset saat keluar dari fase hero
+  /* ---- reset saat hero tidak aktif ---- */
   useEffect(() => {
     if (!active) {
-      hoveredRef.current = false;
-      setHoveredSilhouette(false);
-      setLockedBelial(false);
-      setOrigin(DEFAULT_ORIGIN);
+      setHovering(false);
+      setLocked(false);
       setProgress(0);
+      setLens(null);
       progressRef.current = 0;
       velocityRef.current = 0;
       prevMoodRef.current = false;
+      pointerRef.current = null;
+      lensRef.current = null;
+      committedRef.current = false;
       onBelialStateChange({ progress: 0, belialMood: false, overSilhouette: false });
     }
   }, [active, onBelialStateChange]);
 
-  // Animasi pegas progress (0 -> 1 ~650ms masuk, 1 -> 0 ~500ms keluar)
-  useEffect(() => {
-    if (!active) return;
-
-    if (reducedMotion) {
-      progressRef.current = targetProgress;
-      velocityRef.current = 0;
-      setProgress(targetProgress);
-      return;
-    }
-
-    let rafId = 0;
-    let lastTime = performance.now();
+  /* ---- loop spring transformasi (lensa mengikuti kursor) ---- */
+  const kickProgress = useCallback(() => {
+    if (progressRafRef.current || !active) return;
+    let last = performance.now();
 
     const step = (now: number) => {
-      const dt = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000));
-      lastTime = now;
+      progressRafRef.current = 0;
+      const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
+      last = now;
 
+      const target = targetProgressRef.current;
       const current = progressRef.current;
-      const stiffness = targetProgress > current ? 64 : 80; // ~650ms naik, ~500ms turun
-      const damping = targetProgress > current ? 14.8 : 16.8;
 
-      const force = (targetProgress - current) * stiffness;
-      velocityRef.current = (velocityRef.current + force * dt) * Math.exp(-damping * dt);
-      let next = current + velocityRef.current * dt;
-      next = Math.max(0, Math.min(1, next));
-
-      progressRef.current = next;
-      setProgress(next);
-
-      if (Math.abs(targetProgress - next) > 0.004 || Math.abs(velocityRef.current) > 0.004) {
-        rafId = window.requestAnimationFrame(step);
-      } else {
-        progressRef.current = targetProgress;
+      if (reducedMotion) {
+        progressRef.current = target;
         velocityRef.current = 0;
-        setProgress(targetProgress);
+      } else {
+        const rising = target > current;
+        const stiffness = rising ? 26 : 62;
+        const damping = rising ? 10.5 : 15.2;
+        const force = (target - current) * stiffness;
+        velocityRef.current = (velocityRef.current + force * dt) * Math.exp(-damping * dt);
+        progressRef.current = clamp01(current + velocityRef.current * dt);
+      }
+      setProgress(progressRef.current);
+
+      // Lensa menyusul kursor dengan sedikit kelembaman
+      let lensMoving = false;
+      const ptr = pointerRef.current;
+      if (ptr) {
+        const cur = lensRef.current ?? ptr;
+        const k = reducedMotion ? 1 : 1 - Math.exp(-dt * 13);
+        const nx = cur.x + (ptr.x - cur.x) * k;
+        const ny = cur.y + (ptr.y - cur.y) * k;
+        lensRef.current = { x: nx, y: ny };
+        setLens(lensRef.current);
+        lensMoving = Math.hypot(ptr.x - nx, ptr.y - ny) > 0.6;
+      }
+
+      const settled =
+        Math.abs(target - progressRef.current) < 0.004 && Math.abs(velocityRef.current) < 0.004;
+      if (!settled || (lensMoving && progressRef.current < 0.995)) {
+        progressRafRef.current = window.requestAnimationFrame(step);
+      } else {
+        progressRef.current = target;
+        velocityRef.current = 0;
+        setProgress(target);
       }
     };
+    progressRafRef.current = window.requestAnimationFrame(step);
+  }, [active, reducedMotion]);
 
-    rafId = window.requestAnimationFrame(step);
+  useEffect(() => {
+    if (active) kickProgress();
     return () => {
-      if (rafId) window.cancelAnimationFrame(rafId);
+      if (progressRafRef.current) {
+        window.cancelAnimationFrame(progressRafRef.current);
+        progressRafRef.current = 0;
+      }
     };
-  }, [active, targetProgress, reducedMotion]);
+  }, [active, targetProgress, kickProgress]);
 
-  // Sinkronkan audio, tema mood, dan kursor ketika progress melintasi 0.5
+  /* ---- audio & status mood ---- */
   useEffect(() => {
     if (!active) return;
     const belialMood = progress > 0.5;
@@ -267,389 +353,516 @@ export const HeroProfile: React.FC<HeroProfileProps> = ({
       audioEngine.playBelialTransformDown();
     }
     prevMoodRef.current = belialMood;
-
     audioEngine.setHeroBelialProgress(progress);
-    onBelialStateChange({
-      progress,
-      belialMood,
-      overSilhouette: hoveredSilhouette,
-    });
-  }, [active, progress, hoveredSilhouette, onBelialStateChange]);
+    onBelialStateChange({ progress, belialMood, overSilhouette: hovering });
+  }, [active, progress, hovering, onBelialStateChange]);
 
-  // Hit-test piksel terhadap kanal alpha siluet (bukan kotak bounding box).
-  // Saat wujud Belial sudah muncul, silhouette Belial ikut dihitung agar tidak berkedip kembali.
-  const hitTestSilhouette = useCallback(
-    (clientX: number, clientY: number): { hit: boolean; nx: number; ny: number } => {
-      const box = figureBoxRef.current;
-      if (!box) return { hit: false, nx: 0.5, ny: 0.5 };
-      const rect = box.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) return { hit: false, nx: 0.5, ny: 0.5 };
+  /* ---- gulir: virtual scroll yang mengikuti gerakan (scrub) ---- */
+  const kickScroll = useCallback(() => {
+    if (scrollRafRef.current || !active) return;
+    let last = performance.now();
 
-      const nx = (clientX - rect.left) / rect.width;
-      const ny = (clientY - rect.top) / rect.height;
+    const step = (now: number) => {
+      scrollRafRef.current = 0;
+      const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
+      last = now;
 
-      const cache = alphaCacheRef.current;
-      if (cache && nx >= 0 && nx <= 1 && ny >= 0 && ny <= 1) {
-        const px = Math.min(cache.width - 1, Math.max(0, Math.floor(nx * cache.width)));
-        const py = Math.min(cache.height - 1, Math.max(0, Math.floor(ny * cache.height)));
-        if (cache.data[(py * cache.width + px) * 4 + 3] > 24) {
-          return { hit: true, nx, ny };
-        }
+      const target = scrollTargetRef.current;
+      const cur = scrollRef.current;
+      const next = reducedMotion ? target : cur + (target - cur) * (1 - Math.exp(-dt * 7.5));
+      scrollRef.current = Math.abs(target - next) < 0.0008 ? target : next;
+      setScroll(scrollRef.current);
+
+      if (scrollRef.current >= 0.996 && target >= 1 && !committedRef.current) {
+        committedRef.current = true;
+        onEnterGallery();
+        return;
       }
-
-      const bm = belialMapRef.current;
-      if (bm && progressRef.current > 0.5) {
-        const bx = Math.floor((nx * FIG_W - bm.leftU) / bm.scale);
-        const by = Math.floor((ny * FIG_H - bm.topU) / bm.scale);
-        if (bx >= 0 && by >= 0 && bx < bm.cache.width && by < bm.cache.height) {
-          if (bm.cache.data[(by * bm.cache.width + bx) * 4 + 3] > 24) {
-            return { hit: true, nx: Math.min(1, Math.max(0, nx)), ny: Math.min(1, Math.max(0, ny)) };
-          }
-        }
+      if (scrollRef.current !== target) {
+        scrollRafRef.current = window.requestAnimationFrame(step);
       }
+    };
+    scrollRafRef.current = window.requestAnimationFrame(step);
+  }, [active, reducedMotion, onEnterGallery]);
 
-      return { hit: false, nx, ny };
+  const kickScrollRef = useRef(kickScroll);
+  kickScrollRef.current = kickScroll;
+
+  const armSnap = useCallback(() => {
+    if (snapTimerRef.current) window.clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = window.setTimeout(() => {
+      const t = scrollTargetRef.current;
+      if (t > 0 && t < 1) {
+        scrollTargetRef.current = t > 0.3 ? 1 : 0;
+        kickScroll();
+      }
+    }, 520);
+  }, [kickScroll]);
+
+  const goTo = useCallback(
+    (value: 0 | 1) => {
+      scrollTargetRef.current = value;
+      kickScroll();
     },
-    []
+    [kickScroll]
   );
 
-  const handleStagePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+  // Inisialisasi tiap kali hero aktif
+  useEffect(() => {
+    if (!active) {
+      if (scrollRafRef.current) window.cancelAnimationFrame(scrollRafRef.current);
+      scrollRafRef.current = 0;
+      if (snapTimerRef.current) window.clearTimeout(snapTimerRef.current);
+      return;
+    }
+    committedRef.current = false;
+    const start = entry === 'return' && !reducedMotion ? 1 : 0;
+    scrollRef.current = start;
+    scrollTargetRef.current = 0;
+    setScroll(start);
+    kickScrollRef.current();
+  }, [active, entry, reducedMotion]);
+
+  // Permintaan masuk galeri dari dock
+  const lastSignalRef = useRef(enterSignal);
+  useEffect(() => {
+    if (enterSignal === lastSignalRef.current) return;
+    lastSignalRef.current = enterSignal;
+    if (!active || committedRef.current) return;
+    if (reducedMotion) {
+      committedRef.current = true;
+      onEnterGallery();
+      return;
+    }
+    goTo(1);
+  }, [enterSignal, active, reducedMotion, goTo, onEnterGallery]);
+
+  useEffect(() => {
+    if (!active || inputLocked) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || committedRef.current) return;
+      const next = clamp01(scrollTargetRef.current + e.deltaY / (window.innerHeight * 0.85));
+      scrollTargetRef.current = next;
+      lastInputRef.current = performance.now();
+      kickScroll();
+      armSnap();
+    };
+
+    let startY: number | null = null;
+    let startTarget = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      startY = e.touches[0]?.clientY ?? null;
+      startTarget = scrollTargetRef.current;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (startY === null || committedRef.current) return;
+      const y = e.touches[0]?.clientY ?? startY;
+      scrollTargetRef.current = clamp01(startTarget + (startY - y) / (window.innerHeight * 0.7));
+      kickScroll();
+    };
+    const onTouchEnd = () => {
+      startY = null;
+      armSnap();
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'End') goTo(1);
+      else if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') goTo(0);
+    };
+
+    window.addEventListener('wheel', onWheel, { passive: true });
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd, { passive: true });
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [active, inputLocked, kickScroll, armSnap, goTo]);
+
+  /* ---- hit-test: sosok asli atau (saat sudah berubah) tubuh Belial ---- */
+  const placement = computeBelialPlacement(box, humanBounds, belialBounds);
+
+  const hitTest = useCallback(
+    (clientX: number, clientY: number) => {
+      const el = figureBoxRef.current;
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return null;
+      const x = clientX - r.left;
+      const y = clientY - r.top;
+      const onHuman = alphaAt(humanCacheRef.current, x / r.width, y / r.height);
+      let onBelial = false;
+      if (progressRef.current > 0.3) {
+        const pl = computeBelialPlacement({ w: r.width, h: r.height }, humanBounds, belialBounds);
+        onBelial = alphaAt(belialCacheRef.current, (x - pl.left) / pl.width, (y - pl.top) / pl.height);
+      }
+      return { hit: onHuman || onBelial, x, y };
+    },
+    [humanBounds, belialBounds]
+  );
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
     if (!active) return;
-
-    // Parallax ringan desktop (maks 12px latar, 6px figur)
-    if (!reducedMotion && e.pointerType !== 'touch') {
-      const normX = (e.clientX / Math.max(1, window.innerWidth) - 0.5) * 2;
-      const normY = (e.clientY / Math.max(1, window.innerHeight) - 0.5) * 2;
-      setParallax({ x: normX, y: normY });
+    if (!reducedMotion && e.pointerType !== 'touch' && scrollRef.current < 0.05) {
+      setParallax({
+        x: (e.clientX / Math.max(1, window.innerWidth) - 0.5) * 2,
+        y: (e.clientY / Math.max(1, window.innerHeight) - 0.5) * 2,
+      });
     }
-
-    if (e.pointerType === 'touch') return;
-    const { hit, nx, ny } = hitTestSilhouette(e.clientX, e.clientY);
-    if (hit && !hoveredRef.current && progressRef.current < 0.05) {
-      // Titik kursor saat menyentuh sosok menjadi pusat sapuan energi
-      setOrigin({ x: Math.min(1, Math.max(0, nx)), y: Math.min(1, Math.max(0, ny)) });
+    if (e.pointerType === 'touch' || inputLocked) return;
+    const res = hitTest(e.clientX, e.clientY);
+    const hit = Boolean(res?.hit);
+    if (hit && res) {
+      pointerRef.current = { x: res.x, y: res.y };
+      if (!lensRef.current) lensRef.current = { x: res.x, y: res.y };
     }
-    hoveredRef.current = hit;
-    setHoveredSilhouette(hit);
+    if (hit !== hovering) setHovering(hit);
+    kickProgress();
   };
 
-  const handleStagePointerLeave = () => {
-    hoveredRef.current = false;
-    setHoveredSilhouette(false);
+  const handlePointerLeave = () => {
+    setHovering(false);
     setParallax({ x: 0, y: 0 });
   };
 
-  const handleFigureTap = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== 'touch') return;
-    const { hit, nx, ny } = hitTestSilhouette(e.clientX, e.clientY);
-    if (hit) {
-      if (!lockedBelial) {
-        setOrigin({ x: Math.min(1, Math.max(0, nx)), y: Math.min(1, Math.max(0, ny)) });
-      }
-      setLockedBelial((prev) => !prev);
+  const handlePointerDown = (e: React.PointerEvent<HTMLElement>) => {
+    downRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLElement>) => {
+    const down = downRef.current;
+    downRef.current = null;
+    if (e.pointerType !== 'touch' || !down || inputLocked) return;
+    if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) return;
+    const res = hitTest(e.clientX, e.clientY);
+    if (res?.hit) {
+      pointerRef.current = { x: res.x, y: res.y };
+      lensRef.current = { x: res.x, y: res.y };
+      setLocked((prev) => !prev);
+      kickProgress();
     }
   };
 
-  // Dukungan giroskop opsional di perangkat seluler jika tersedia & diizinkan tanpa memaksa prompt
-  useEffect(() => {
-    if (!active || reducedMotion || typeof window === 'undefined') return;
-    if (!('DeviceOrientationEvent' in window)) return;
-    const DOE = window.DeviceOrientationEvent as unknown as {
-      requestPermission?: () => Promise<'granted' | 'denied'>;
+  const toggleLockFromButton = () => {
+    audioEngine.playTabClick();
+    const b = humanBounds;
+    const origin = {
+      x: ((b.minX + b.maxX) / 2) * box.w,
+      y: (b.minY + (b.maxY - b.minY) * HERO_ANCHORS.chest.y) * box.h,
     };
-    // Jangan memicu prompt izin otomatis jika Safari iOS mewajibkan requestPermission dari klik eksplisit
-    if (typeof DOE?.requestPermission === 'function') return;
-
-    const onOrient = (ev: DeviceOrientationEvent) => {
-      if (ev.gamma === null || ev.beta === null) return;
-      const gx = Math.max(-1, Math.min(1, ev.gamma / 28));
-      const gy = Math.max(-1, Math.min(1, (ev.beta - 45) / 28));
-      setParallax({ x: gx, y: gy });
-    };
-
-    window.addEventListener('deviceorientation', onOrient, { passive: true });
-    return () => window.removeEventListener('deviceorientation', onOrient);
-  }, [active, reducedMotion]);
+    pointerRef.current = origin;
+    lensRef.current = origin;
+    setLens(origin);
+    setLocked((prev) => !prev);
+    kickProgress();
+  };
 
   if (!active) return null;
 
+  /* ---- turunan visual ---- */
   const belialMood = progress > 0.5;
-  const warpOut = warp === 'out';
-  const bgTx = reducedMotion ? 0 : -parallax.x * 12;
-  const bgTy = reducedMotion ? 0 : -parallax.y * 8;
-  const titleTx = reducedMotion ? 0 : -parallax.x * 8;
-  const titleTy = reducedMotion ? 0 : -parallax.y * 5;
-  const figTx = reducedMotion ? 0 : -parallax.x * 6;
-  const figTy = reducedMotion ? 0 : -parallax.y * 4;
+  const s = scroll;
+  const px = reducedMotion ? 0 : parallax.x;
+  const py = reducedMotion ? 0 : parallax.y;
 
-  const warpEase = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
-  const bgWarp = warpOut ? ' scale(1.16)' : '';
-  const titleWarp = warpOut ? ' scale(1.55)' : '';
-  const figWarp = warpOut ? ' translateY(4%) scale(1.42)' : '';
+  const lensOrigin = lens ?? {
+    x: ((humanBounds.minX + humanBounds.maxX) / 2) * box.w,
+    y: (humanBounds.minY + (humanBounds.maxY - humanBounds.minY) * HERO_ANCHORS.chest.y) * box.h,
+  };
 
-  const instructionDesktop =
-    'Arahkan kursor ke sosok untuk memanggil wujud Belial • Gulir ke bawah untuk masuk galeri';
-  const instructionMobile =
-    'Ketuk sosok atau Ubah Wujud untuk memanggil Belial • Geser ke atas untuk masuk galeri';
+  const bgStyle: React.CSSProperties = {
+    transform: `translate3d(${(-px * 10).toFixed(1)}px, ${(-py * 6 - s * 30).toFixed(1)}px, 0) scale(${(1 + s * 0.16).toFixed(3)})`,
+    filter: `brightness(${(1 - s * 0.55).toFixed(2)})`,
+  };
+  const titleStyle: React.CSSProperties = {
+    transform: `translate3d(${(-px * 7).toFixed(1)}px, ${(-py * 4 - s * 22).toFixed(2)}vh, 0) scale(${(1 + s * 0.5).toFixed(3)})`,
+    opacity: 1 - smooth(0.4, 0.82, s),
+  };
+  const figureStyle: React.CSSProperties = {
+    transform: `translate3d(${(-px * 5).toFixed(1)}px, ${(-py * 3 + s * 6).toFixed(2)}vh, 0) scale(${(1 + s * 0.55).toFixed(3)})`,
+    transformOrigin: '50% 100%',
+    opacity: 1 - smooth(0.68, 0.98, s),
+  };
+  const uiStyle: React.CSSProperties = {
+    opacity: 1 - smooth(0, 0.22, s),
+    transform: `translate3d(0, ${(s * 28).toFixed(1)}px, 0)`,
+    pointerEvents: s > 0.08 ? 'none' : undefined,
+  };
+  const rigStyle: React.CSSProperties = {
+    transform: `translate3d(${(px * 6).toFixed(1)}px, 0, 0) scale(${(1 + s * 1.5).toFixed(3)})`,
+    transformOrigin: '50% 0%',
+    opacity: 1 - smooth(0.55, 0.9, s),
+  };
+
+  const titleNormalOpacity = 1 - smooth(0.32, 0.6, progress);
+  const titleBelialOpacity = smooth(0.42, 0.72, progress);
 
   return (
     <section
-      ref={stageRef}
-      aria-label="Profil Fotografer Dikut Affan Aryansyah"
-      onPointerMove={handleStagePointerMove}
-      onPointerLeave={handleStagePointerLeave}
-      onPointerDown={handleFigureTap}
-      className={`fixed inset-0 z-20 overflow-hidden bg-[#080507] select-none ${
-        warp === 'in' ? 'hero-warp-in' : ''
-      }`}
-      style={{
-        opacity: warpOut ? 0 : 1,
-        transition: warpOut ? `opacity 620ms ${warpEase}` : undefined,
-      }}
+      aria-label="Profil fotografer Dikut Affan Aryansyah"
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      className="fixed inset-0 z-20 overflow-hidden bg-[#07060A] select-none"
     >
-      {/* LAPISAN 1: Suasana malam kota & perpanjangan landscape yang mulus (parallax maks 12px) */}
+      {/* Lapisan 1: malam kota dan semburat senja yang berubah merah saat Belial bangkit */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-4 will-change-transform"
-        style={{
-          transform: `translate3d(${bgTx.toFixed(1)}px, ${bgTy.toFixed(1)}px, 0)${bgWarp}`,
-          transition: warpOut
-            ? `transform 620ms ${warpEase}`
-            : 'transform 150ms cubic-bezier(0, 0, 0.2, 1)',
-        }}
+        className="pointer-events-none absolute -inset-6 will-change-transform"
+        style={bgStyle}
       >
-        {/* Langit malam kota + semburat merah senja yang menguat saat Belial bangkit */}
         <div
-          className="absolute inset-0 transition-colors duration-300"
+          className="absolute inset-0"
           style={{
-            background: belialMood
-              ? 'radial-gradient(circle at 68% 45%, rgba(128, 12, 26, 0.46) 0%, rgba(16, 7, 13, 0.94) 55%, #080507 100%)'
-              : 'radial-gradient(circle at 68% 45%, rgba(74, 14, 26, 0.3) 0%, rgba(14, 7, 11, 0.96) 58%, #080507 100%)',
+            background:
+              'radial-gradient(ellipse 60% 55% at 72% 44%, rgba(96, 16, 36, 0.42) 0%, rgba(14, 8, 16, 0.96) 62%, #07060A 100%)',
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            opacity: progress,
+            background:
+              'radial-gradient(ellipse 62% 58% at 72% 46%, rgba(160, 14, 36, 0.5) 0%, rgba(40, 6, 14, 0.7) 55%, transparent 100%)',
           }}
         />
 
-        {/* Foto asli 1061x1889 (jika disediakan di src/assets/hero/photo-original.jpg) dengan tepi feathered */}
         {HERO_ASSETS.photoOriginalUrl && (
-          <div className="absolute inset-0 flex justify-center md:justify-end md:pr-[6%] lg:pr-[9%] items-end">
+          <div className="absolute inset-0 flex justify-center md:justify-end md:pr-[6%] lg:pr-[10%] items-end">
             <img
               src={HERO_ASSETS.photoOriginalUrl}
               alt=""
-              className="h-[calc(100vh-44px)] w-auto max-w-none object-cover opacity-85"
+              className="h-[calc(100vh-44px)] w-auto max-w-none object-cover opacity-80"
               style={{
-                maskImage:
-                  'linear-gradient(to right, transparent 0%, black 18%, black 82%, transparent 100%)',
-                WebkitMaskImage:
-                  'linear-gradient(to right, transparent 0%, black 18%, black 82%, transparent 100%)',
-                filter:
-                  progress > 0.02
-                    ? `brightness(${(1 - progress * 0.34).toFixed(2)}) contrast(${(1 + progress * 0.14).toFixed(2)}) saturate(${(1 + progress * 0.1).toFixed(2)})`
-                    : undefined,
+                maskImage: 'linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%)',
+                filter: `brightness(${(1 - progress * 0.3).toFixed(2)}) saturate(${(1 - progress * 0.25).toFixed(2)})`,
               }}
             />
           </div>
         )}
 
-        {/* Lampu kota bokeh prosedural (berkedip merah saat transformasi) */}
+        {/* Bokeh lampu kota: kuning sodium, memerah saat Belial bangkit */}
         <div className="absolute inset-0">
-          {CITY_BOKEH_LIGHTS.map((light, idx) => {
-            const flickerColor =
-              progress > 0.35 ? 'rgba(239, 35, 60, 0.85)' : 'rgba(251, 191, 36, 0.55)';
-            return (
-              <span
-                key={idx}
-                className="absolute rounded-full"
-                style={{
-                  left: light.x,
-                  top: light.y,
-                  width: `${light.size}px`,
-                  height: `${light.size}px`,
-                  background: `radial-gradient(circle, ${flickerColor} 0%, transparent 72%)`,
-                  opacity: 0.38 + progress * 0.45,
-                  filter: 'blur(2px)',
-                }}
-              />
-            );
-          })}
+          {CITY_LIGHTS.map((l, i) => (
+            <span
+              key={i}
+              className="absolute rounded-full"
+              style={{
+                left: l.x,
+                top: l.y,
+                width: l.size,
+                height: l.size,
+                background: `radial-gradient(circle, ${
+                  progress > 0.4 ? 'rgba(239, 35, 60, 0.85)' : 'rgba(255, 176, 32, 0.6)'
+                } 0%, transparent 72%)`,
+                opacity: 0.34 + progress * 0.4,
+                filter: 'blur(2px)',
+              }}
+            />
+          ))}
         </div>
-
-        {/* Garis cakrawala jembatan / parapet & garis kuning trotoar malam */}
-        <div
-          className="absolute inset-x-0 bottom-[16%] h-px"
-          style={{
-            background:
-              progress > 0.4
-                ? 'linear-gradient(to right, transparent, rgba(239,35,60,0.45), transparent)'
-                : 'linear-gradient(to right, transparent, rgba(168,150,155,0.22), transparent)',
-          }}
-        />
-        <div
-          className="absolute inset-x-0 bottom-[9%] h-[2px] opacity-35"
-          style={{
-            background:
-              progress > 0.4
-                ? 'linear-gradient(to right, transparent 10%, rgba(239,35,60,0.5) 55%, transparent 92%)'
-                : 'linear-gradient(to right, transparent 10%, rgba(250,204,21,0.35) 55%, transparent 92%)',
-          }}
-        />
       </div>
 
-      {/* LAPISAN 2: Judul Besar di BELAKANG figur (z-15 < figur z-30) */}
+      {/* Lapisan 3: judul besar di belakang sosok */}
       <div
-        className="pointer-events-none fixed inset-x-0 top-[74px] sm:top-[82px] md:top-1/2 md:-translate-y-[66%] z-[15] flex justify-center md:justify-start md:pl-[7%] lg:pl-[9%] px-4 text-center md:text-left will-change-transform"
-        style={{
-          transform: `translate3d(${titleTx.toFixed(1)}px, ${titleTy.toFixed(1)}px, 0)${titleWarp}`,
-          transformOrigin: '30% 50%',
-          transition: warpOut ? `transform 620ms ${warpEase}` : undefined,
-        }}
+        className="pointer-events-none absolute inset-x-0 top-[16%] md:top-[15%] z-[15] px-5 md:pl-[6%] lg:pl-[7%] will-change-transform"
+        style={titleStyle}
       >
-        <SplitFlapHero
-          mode="hero"
-          reducedMotion={reducedMotion}
-          titleText={belialMood ? 'BELIAL' : 'FANZ FIGHTERS'}
-          subtitleText={
-            belialMood
-              ? 'DARK GALACTIC EMPEROR · @fanzfighters_pict'
-              : OWNER_IDENTITY.fullName
-          }
-          belialMood={belialMood}
-        />
+        <h1 aria-label={belialMood ? 'Belial' : 'Fanz Fighters'} className="grid">
+          <span
+            aria-hidden="true"
+            className="col-start-1 row-start-1 font-display font-extrabold uppercase text-[#EFE7E1] leading-[0.82] tracking-[0.01em] md:whitespace-nowrap text-[length:clamp(64px,min(14vw,26vh),250px)] -skew-x-6 origin-bottom-left"
+            style={{ opacity: titleNormalOpacity }}
+          >
+            Fanz Fighters
+          </span>
+          <span
+            aria-hidden="true"
+            className="col-start-1 row-start-1 font-display font-extrabold uppercase text-[#E0243B] leading-[0.82] tracking-[0.01em] md:whitespace-nowrap text-[length:clamp(64px,min(14vw,26vh),250px)] -skew-x-6 origin-bottom-left"
+            style={{ opacity: titleBelialOpacity }}
+          >
+            Belial
+          </span>
+        </h1>
+
+        <div className="relative mt-4 md:mt-6 min-h-[48px]">
+          <div style={{ opacity: titleNormalOpacity }} className="absolute inset-0">
+            <p className="font-sans text-lg md:text-xl font-semibold text-[#EFE7E1]">{OWNER_IDENTITY.fullName}</p>
+            <p className="font-sans text-sm text-[#B4A3A8] mt-0.5">Fotografer pesawat dan kereta api · CGK, HLP, DPS</p>
+          </div>
+          <div style={{ opacity: titleBelialOpacity }} className="absolute inset-0">
+            <p className="font-sans text-lg md:text-xl font-semibold text-[#FFB020]">Dark Galactic Emperor</p>
+            <p className="font-sans text-sm text-[#B4A3A8] mt-0.5">{OWNER_IDENTITY.aviationHandle}</p>
+          </div>
+        </div>
       </div>
 
-      {/* Panggung Figur (Aspek rasio terkunci 1061x1889 agar seluruh jangkar & efek presisi) */}
+      {/* Lapisan 4: Belial + sosok (satu kotak, rasio terkunci 1061x1889) */}
       <div className="pointer-events-none fixed inset-0 z-20 flex items-end justify-center md:justify-end md:pr-[6%] lg:pr-[10%]">
         <div
           ref={figureBoxRef}
           className="relative aspect-[1061/1889] h-[78dvh] sm:h-[84dvh] md:h-[calc(100vh-52px)] max-h-[960px] will-change-transform"
-          style={{
-            transform: `translate3d(${figTx.toFixed(1)}px, ${figTy.toFixed(1)}px, 0)${figWarp}`,
-            transformOrigin: '50% 80%',
-            transition: warpOut ? `transform 620ms ${warpEase}` : undefined,
-          }}
+          style={figureStyle}
         >
-          {/* Retakan energi merah di trotoar sekitar kaki */}
-          <BelialCityCracks progress={progress} />
-
-          {/* LAPISAN 3: Aura merah & kabut energi gelap di BELAKANG sosok */}
-          <BelialBackEffects progress={progress} reducedMotion={reducedMotion} />
-
-          {/* LAPISAN 4-5: Spring Morph manusia -> Belial dengan Cursor Energy Reveal */}
-          <BelialMorphStage
-            progress={progress}
-            origin={origin}
-            boxPx={boxPx}
-            humanUrl={HERO_ASSETS.figureCutoutUrl}
-            humanAlt="Sosok pemilik situs dari belakang berdiri di trotoar malam hari"
-            belialUrl={HERO_ASSETS.belialFormUrl}
-            layout={belialLayout}
-            reducedMotion={reducedMotion}
-          />
+          {box.w > 0 && (
+            <>
+              <BelialAura progress={progress} placement={placement} reducedMotion={reducedMotion} />
+              <BelialMorphStage
+                progress={progress}
+                origin={lensOrigin}
+                box={box}
+                placement={placement}
+                humanUrl={HERO_ASSETS.figureCutoutUrl}
+                humanAlt="Dikut Affan Aryansyah berdiri membelakangi kamera di malam hari"
+                belialUrl={belialFormImg}
+                reducedMotion={reducedMotion}
+              />
+            </>
+          )}
+          {box.w === 0 && (
+            <img
+              src={HERO_ASSETS.figureCutoutUrl}
+              alt="Dikut Affan Aryansyah berdiri membelakangi kamera di malam hari"
+              draggable={false}
+              className="absolute inset-0 z-30 w-full h-full object-contain"
+            />
+          )}
         </div>
       </div>
 
-      {/* LAPISAN 6: Kanvas 2D partikel bara api yang naik dari lantai & kilat energi */}
       <BelialEmberCanvas
         active={active}
         progress={progress}
         tabVisible={tabVisible}
         reducedMotion={reducedMotion}
-        anchorRef={figureBoxRef}
+        zone={emberZone}
       />
 
-      {/* Scrim bawah agar CTA & teks tetap kontras >= 4.5:1 di atas foto pada layar ponsel */}
+      {/* Lapisan 5: tiang dan kawat dekat; kamera "maju" sehingga rig membesar dan menyapu keluar layar saat digulir */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[41] will-change-transform" style={rigStyle}>
+        <ForegroundRig />
+      </div>
+
+      {/* Scrim bawah agar teks tetap terbaca */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-x-0 bottom-0 h-[260px] md:h-[220px] z-[42] bg-gradient-to-t from-[#080507] via-[#080507]/75 to-transparent"
+        className="pointer-events-none fixed inset-x-0 bottom-0 h-[220px] z-[18] bg-gradient-to-t from-[#07060A] via-[#07060A]/75 to-transparent"
       />
 
-      {/* LAPISAN 7: Identitas, tombol Masuk Galeri, Ubah Wujud aksesibel, & 2 tautan Instagram flight-strip */}
-      <div className="fixed inset-x-0 bottom-[78px] sm:bottom-[88px] md:bottom-[98px] z-50 px-4 sm:px-6 md:px-10 lg:pl-[9%] flex flex-col items-center md:items-start gap-3 pointer-events-none">
-        <div className="pointer-events-auto flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+      {/* UI: tombol, tautan, petunjuk */}
+      <div
+        className="fixed inset-x-0 bottom-[84px] sm:bottom-[94px] md:bottom-[104px] z-50 px-5 sm:px-6 md:px-10 lg:pl-[7%] flex flex-col items-center md:items-start gap-4 pointer-events-none"
+        style={uiStyle}
+      >
+        <div className="pointer-events-auto flex flex-wrap items-center justify-center md:justify-start gap-3">
           <button
             type="button"
             onClick={() => {
               audioEngine.playTabClick();
-              onEnterGallery();
+              if (reducedMotion) {
+                if (!committedRef.current) {
+                  committedRef.current = true;
+                  onEnterGallery();
+                }
+              } else {
+                goTo(1);
+              }
             }}
-            className={`min-h-[44px] inline-flex items-center gap-2 px-5 py-2.5 rounded-[4px] font-mono text-xs font-semibold tracking-[0.1em] uppercase transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${
-              belialMood
-                ? 'bg-[#EF233C] hover:bg-[#FF5A6E] text-[#F6EEF0]'
-                : 'bg-[#EF233C] hover:bg-[#FF5A6E] text-[#080507]'
-            }`}
+            className="group -skew-x-12 min-h-[48px] inline-flex items-center bg-[#EFE7E1] hover:bg-[#EF233C] text-[#07060A] hover:text-[#EFE7E1] transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB020] focus-visible:ring-offset-2 focus-visible:ring-offset-[#07060A]"
           >
-            <span>Masuk Galeri</span>
-            <IconNext className="w-4 h-4 shrink-0" />
+            <span className="skew-x-12 inline-flex items-center gap-2.5 px-6 py-3 font-sans text-[15px] font-bold">
+              Masuk galeri
+              <IconNext className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" />
+            </span>
           </button>
 
           <button
             type="button"
-            aria-pressed={lockedBelial || hoveredSilhouette}
-            onClick={() => {
-              audioEngine.playTabClick();
-              if (!lockedBelial) setOrigin(DEFAULT_ORIGIN);
-              setLockedBelial((prev) => !prev);
-            }}
-            className={`min-h-[44px] inline-flex items-center gap-2 px-4 py-2.5 bg-[#120A0D] border rounded-[4px] font-mono text-xs tracking-[0.1em] uppercase transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C] ${
-              belialMood || lockedBelial
-                ? 'border-[#EF233C] text-[#FF5A6E] hover:bg-[#EF233C]/15'
-                : 'border-[#2B1218] text-[#F6EEF0] hover:border-[#EF233C] hover:text-[#EF233C]'
+            aria-pressed={locked}
+            onClick={toggleLockFromButton}
+            className={`-skew-x-12 min-h-[48px] inline-flex items-center border transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB020] focus-visible:ring-offset-2 focus-visible:ring-offset-[#07060A] ${
+              locked || belialMood
+                ? 'border-[#EF233C] bg-[#EF233C]/15 text-[#EFE7E1]'
+                : 'border-[#EFE7E1]/35 text-[#EFE7E1] hover:border-[#FFB020] hover:text-[#FFB020]'
             }`}
           >
-            <IconTransform className="w-4 h-4 shrink-0" />
-            <span>{belialMood ? 'Wujud Normal' : 'Ubah Wujud'}</span>
+            <span className="skew-x-12 inline-flex items-center gap-2.5 px-5 py-3 font-sans text-[15px] font-semibold">
+              <IconTransform className="w-4 h-4 shrink-0" />
+              {locked ? 'Wujud normal' : 'Ubah wujud'}
+            </span>
           </button>
         </div>
 
-        {/* Tautan Instagram Aviation & Rail bergaya flight-strip ATC */}
-        <div className="pointer-events-auto flex flex-wrap items-center justify-center md:justify-start gap-2">
+        <div className="pointer-events-auto flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-1">
           <a
             href={OWNER_IDENTITY.aviationUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="min-h-[44px] inline-flex items-center gap-2 px-3.5 py-2 bg-[#120A0D] border border-[#2B1218] hover:border-[#EF233C] rounded-[4px] font-mono text-xs tracking-[0.08em] text-[#F6EEF0] hover:text-[#EF233C] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C]"
+            className="min-h-[44px] inline-flex items-center gap-2 font-sans text-sm text-[#EFE7E1] hover:text-[#FFB020] transition-colors underline decoration-[#EF233C] decoration-2 underline-offset-[7px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB020]"
           >
             <IconInstagram className="w-4 h-4 text-[#EF233C] shrink-0" />
-            <span>AVIATION {OWNER_IDENTITY.aviationHandle}</span>
+            <span>Pesawat {OWNER_IDENTITY.aviationHandle}</span>
           </a>
-
           <a
             href={OWNER_IDENTITY.railUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="min-h-[44px] inline-flex items-center gap-2 px-3.5 py-2 bg-[#120A0D] border border-[#2B1218] hover:border-[#EF233C] rounded-[4px] font-mono text-xs tracking-[0.08em] text-[#F6EEF0] hover:text-[#EF233C] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF233C]"
+            className="min-h-[44px] inline-flex items-center gap-2 font-sans text-sm text-[#EFE7E1] hover:text-[#FFB020] transition-colors underline decoration-[#EF233C] decoration-2 underline-offset-[7px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB020]"
           >
             <IconInstagram className="w-4 h-4 text-[#EF233C] shrink-0" />
-            <span>RAIL {OWNER_IDENTITY.railHandle}</span>
+            <span>Kereta {OWNER_IDENTITY.railHandle}</span>
           </a>
         </div>
 
-        <p className="font-mono text-xs tracking-[0.1em] text-[#A8969B] uppercase text-center md:text-left max-w-[min(620px,92vw)]">
-          <span className="hidden md:inline">{instructionDesktop}</span>
-          <span className="md:hidden">{instructionMobile}</span>
-        </p>
-        <p
-          aria-hidden="true"
-          className="md:hidden font-mono text-xs tracking-[0.16em] text-[#EF233C] uppercase"
-        >
-          SCROLL DOWN // ENTER ARCHIVE
+        <p className="font-sans text-[13px] text-[#B4A3A8] max-w-[46ch] text-center md:text-left">
+          <span className="hidden md:inline">Dekatkan kursor ke sosok untuk memanggil Belial. Gulir untuk masuk galeri.</span>
+          <span className="md:hidden">Ketuk sosok untuk memanggil Belial. Geser ke atas untuk masuk galeri.</span>
         </p>
       </div>
 
-      {/* Indikator scroll bergaya instrumen kokpit */}
+      {/* Petunjuk gulir: rel vertikal dengan penanda yang meluncur turun */}
+      <button
+        type="button"
+        onClick={() => {
+          audioEngine.playTabClick();
+          if (reducedMotion) {
+            if (!committedRef.current) {
+              committedRef.current = true;
+              onEnterGallery();
+            }
+          } else {
+            goTo(1);
+          }
+        }}
+        aria-label="Gulir untuk masuk galeri"
+        className="fixed right-3 md:right-6 bottom-[112px] md:bottom-[120px] z-50 hidden sm:flex flex-col items-center gap-3 text-[#B4A3A8] hover:text-[#FFB020] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB020] p-2"
+        style={{ opacity: 1 - smooth(0, 0.15, s), pointerEvents: s > 0.1 ? 'none' : undefined }}
+      >
+        <span className="font-sans text-[12px] [writing-mode:vertical-rl]">Gulir untuk masuk galeri</span>
+        <span className="relative block w-px h-14 bg-[#EFE7E1]/20 overflow-hidden">
+          <span className="scroll-tick absolute left-0 top-0 block w-px h-4 bg-[#EF233C]" />
+        </span>
+      </button>
+
+      {/* Tirai gelap: menutup layar tepat sebelum galeri dibuka */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed z-50 bottom-[34px] right-10 hidden md:flex flex-col items-end gap-1.5 whitespace-nowrap"
-      >
-        <span className="font-mono text-xs tracking-[0.16em] text-[#F6EEF0] uppercase tabular-nums">
-          SCROLL DOWN // ENTER ARCHIVE
-        </span>
-        <span className="relative block w-px h-10 bg-[#2B1218] overflow-hidden">
-          <span
-            className={`absolute left-0 top-0 w-px h-4 bg-[#EF233C] ${
-              reducedMotion ? '' : 'hero-scroll-tick'
-            }`}
-          />
-        </span>
-      </div>
+        className="pointer-events-none fixed inset-0 z-[44]"
+        style={{
+          opacity: smooth(0.7, 1, s),
+          background: 'radial-gradient(ellipse at 50% 55%, #14070B 0%, #07060A 70%)',
+        }}
+      />
     </section>
   );
 };

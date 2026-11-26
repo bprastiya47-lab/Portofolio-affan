@@ -1,317 +1,251 @@
 import React, { useEffect, useId, useRef } from 'react';
+import {
+  AlphaBounds,
+  BELIAL_EYES,
+  BELIAL_IMAGE_ASPECT,
+  BELIAL_ORB,
+} from './heroAnchors';
 
-/** Posisi gambar Belial di dalam kotak figur, dalam persen terhadap kotak figur (1061x1889). */
-export interface BelialLayout {
-  leftPct: number;
-  topPct: number;
-  widthPct: number;
-  heightPct: number;
-}
+/* ------------------------------------------------------------------ */
+/* Tata letak                                                          */
+/* ------------------------------------------------------------------ */
 
-export interface MorphOrigin {
-  x: number;
-  y: number;
-}
-
-export interface BoxPx {
+export interface BoxSize {
   w: number;
   h: number;
 }
 
-interface BackEffectsProps {
-  progress: number;
-  reducedMotion: boolean;
+export interface BelialPlacement {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  feetY: number;
+  centerX: number;
 }
 
-/**
- * Lapisan di BELAKANG figur: cahaya inti merah bara dan kabut energi gelap
- * (feTurbulence + feDisplacementMap) yang bergolak di sekitar siluet.
- */
-export const BelialBackEffects: React.FC<BackEffectsProps> = ({ progress, reducedMotion }) => {
-  const uid = useId().replace(/:/g, '');
-  const fogFilterId = `belial-fog-${uid}`;
+/** Belial berdiri sedikit lebih tinggi dari tubuh sosok asli */
+const BELIAL_HEIGHT_RATIO = 1.04;
 
-  if (progress <= 0.01) return null;
+/** Kaki Belial menapak di garis sepatu sosok asli; tengah tubuh keduanya sejajar. */
+export function computeBelialPlacement(
+  box: BoxSize,
+  human: AlphaBounds,
+  belial: AlphaBounds
+): BelialPlacement {
+  const humanBodyH = (human.maxY - human.minY) * box.h;
+  const feetY = human.maxY * box.h;
+  const centerX = ((human.minX + human.maxX) / 2) * box.w;
 
-  const opacity = Math.min(1, progress * 1.15);
+  const belialBodyNorm = Math.max(0.2, belial.maxY - belial.minY);
+  const height = (humanBodyH * BELIAL_HEIGHT_RATIO) / belialBodyNorm;
+  const width = height * BELIAL_IMAGE_ASPECT;
+  const belialCenterX = (belial.minX + belial.maxX) / 2;
 
-  return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0 z-20 overflow-visible"
-      style={{ opacity }}
-    >
-      <div
-        className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{
-          left: '50%',
-          top: '52%',
-          width: `${70 + progress * 50}%`,
-          height: `${40 + progress * 22}%`,
-          background:
-            'radial-gradient(circle, rgba(239, 35, 60, 0.38) 0%, rgba(120, 8, 22, 0.24) 45%, transparent 74%)',
-          filter: 'blur(20px)',
-        }}
-      />
+  return {
+    left: centerX - width * belialCenterX,
+    top: feetY - height * belial.maxY,
+    width,
+    height,
+    feetY,
+    centerX,
+  };
+}
 
-      <svg
-        viewBox="0 0 100 178"
-        className="absolute -inset-x-[40%] -inset-y-[6%] w-[180%] h-[112%] overflow-visible"
-        preserveAspectRatio="none"
-      >
-        <defs>
-          <filter id={fogFilterId} x="-30%" y="-30%" width="160%" height="160%">
-            <feTurbulence
-              type="fractalNoise"
-              baseFrequency="0.026 0.055"
-              numOctaves="3"
-              seed="11"
-              result="noise"
-            >
-              {!reducedMotion && (
-                <animate
-                  attributeName="baseFrequency"
-                  dur="5.2s"
-                  values="0.024 0.050;0.038 0.078;0.024 0.050"
-                  repeatCount="indefinite"
-                />
-              )}
-            </feTurbulence>
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="noise"
-              scale={4 + progress * 9}
-              xChannelSelector="R"
-              yChannelSelector="G"
-              result="displaced"
-            />
-            <feGaussianBlur in="displaced" stdDeviation="0.9" />
-          </filter>
-          <radialGradient id={`${fogFilterId}-core`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#2A0510" stopOpacity="0.95" />
-            <stop offset="55%" stopColor="#12030A" stopOpacity="0.7" />
-            <stop offset="100%" stopColor="#080507" stopOpacity="0" />
-          </radialGradient>
-        </defs>
+/** Jarak dari titik asal ke sudut terjauh gabungan kotak figur dan gambar Belial */
+function maxRevealRadius(
+  origin: { x: number; y: number },
+  box: BoxSize,
+  p: BelialPlacement
+): number {
+  const pts: Array<[number, number]> = [
+    [0, 0],
+    [box.w, 0],
+    [0, box.h],
+    [box.w, box.h],
+    [p.left, p.top],
+    [p.left + p.width, p.top],
+    [p.left, p.top + p.height],
+    [p.left + p.width, p.top + p.height],
+  ];
+  let max = 0;
+  for (const [x, y] of pts) max = Math.max(max, Math.hypot(x - origin.x, y - origin.y));
+  return max;
+}
 
-        {/* Kabut energi gelap bertepi merah di belakang tubuh */}
-        <g filter={`url(#${fogFilterId})`}>
-          <ellipse
-            cx="50"
-            cy="104"
-            rx={26 + progress * 20}
-            ry={60 + progress * 10}
-            fill={`url(#${fogFilterId}-core)`}
-          />
-          <ellipse
-            cx="50"
-            cy="132"
-            rx={34 + progress * 20}
-            ry="18"
-            fill="#EF233C"
-            fillOpacity="0.2"
-          />
-          <ellipse cx="50" cy="64" rx={18 + progress * 12} ry="26" fill="#EF233C" fillOpacity="0.1" />
-        </g>
-      </svg>
-    </div>
-  );
-};
+/* ------------------------------------------------------------------ */
+/* Lensa transformasi                                                  */
+/* ------------------------------------------------------------------ */
 
-interface MorphStageProps {
+interface BelialMorphStageProps {
   progress: number;
-  origin: MorphOrigin;
-  boxPx: BoxPx;
+  /** Pusat lensa (piksel di kotak figur); mengikuti kursor saat hover */
+  origin: { x: number; y: number };
+  box: BoxSize;
+  placement: BelialPlacement;
   humanUrl: string;
   humanAlt: string;
   belialUrl: string;
-  layout: BelialLayout | null;
   reducedMotion: boolean;
 }
 
 /**
- * Spring Morph: sosok manusia (figure-cutout) meluruh dari titik kursor,
- * wujud penuh Belial (berial2-removebg-preview) muncul lewat radial mask
- * yang sama, dengan cincin kejut crimson dan distorsi energi di tepi sapuan.
+ * Sosok manusia dan Belial saling melarutkan lewat satu radial mask yang bergerak mengikuti kursor.
+ * Tepi lensa hanya menyala di atas tubuh (dimask ke alpha cutout), bukan lingkaran melayang di latar,
+ * dan bagian tepinya diguncang gelombang panas (feTurbulence) selama transformasi.
  */
-export const BelialMorphStage: React.FC<MorphStageProps> = ({
+export const BelialMorphStage: React.FC<BelialMorphStageProps> = ({
   progress,
   origin,
-  boxPx,
+  box,
+  placement,
   humanUrl,
   humanAlt,
   belialUrl,
-  layout,
   reducedMotion,
 }) => {
   const uid = useId().replace(/:/g, '');
-  const warpFilterId = `belial-warp-${uid}`;
+  const warpId = `belial-warp-${uid}`;
 
-  const W = Math.max(1, boxPx.w);
-  const H = Math.max(1, boxPx.h);
-  const mx = W * 0.9;
-  const my = H * 0.25;
-  const ox = mx + origin.x * W;
-  const oy = my + origin.y * H;
+  const feather = Math.max(34, box.h * 0.075);
+  const full = maxRevealRadius(origin, box, placement) + feather;
+  // Radius dasar kecil agar lensa langsung terlihat di bawah kursor saat hover baru dimulai
+  const radius = progress <= 0.002 ? 0 : box.h * 0.05 + progress * (full - box.h * 0.05);
+  const inner = Math.max(0, radius - feather);
 
-  const morphing = progress > 0.003 && progress < 0.997;
-  const full = progress >= 0.997;
+  const ox = origin.x.toFixed(1);
+  const oy = origin.y.toFixed(1);
 
-  const maxR = Math.hypot(W * 1.9, H * 1.3);
-  const feather = Math.max(40, W * 0.16);
-  const radius = progress * (maxR + feather) - feather;
-  const inner = Math.max(0, radius);
-  const outer = Math.max(inner + 1, radius + feather);
+  const humanMask = `radial-gradient(circle at ${ox}px ${oy}px, transparent ${inner.toFixed(1)}px, #000 ${radius.toFixed(1)}px)`;
+  const belialMask = `radial-gradient(circle at ${(origin.x - placement.left).toFixed(1)}px ${(
+    origin.y - placement.top
+  ).toFixed(1)}px, #000 ${inner.toFixed(1)}px, transparent ${radius.toFixed(1)}px)`;
 
-  const humanMask = morphing
-    ? `radial-gradient(circle at ${ox.toFixed(1)}px ${oy.toFixed(1)}px, transparent ${inner.toFixed(1)}px, #000 ${outer.toFixed(1)}px)`
-    : undefined;
-  const belialMask = morphing
-    ? `radial-gradient(circle at ${ox.toFixed(1)}px ${oy.toFixed(1)}px, #000 ${inner.toFixed(1)}px, transparent ${outer.toFixed(1)}px)`
-    : undefined;
+  const bell = Math.sin(Math.PI * Math.min(1, Math.max(0, progress)));
+  const warping = !reducedMotion && progress > 0.01 && progress < 0.985;
+  const warpScale = bell * box.h * 0.035;
+  const edgeStrength = Math.pow(bell, 0.55);
 
-  const ringCenter = radius + feather * 0.5;
-  const ringVisible = morphing && ringCenter > 2;
-  const ringStrength = Math.pow(Math.sin(Math.PI * Math.min(1, progress)), 0.55);
-  const ringBackground = ringVisible
-    ? `radial-gradient(circle at ${ox.toFixed(1)}px ${oy.toFixed(1)}px, transparent ${Math.max(
-        0,
-        ringCenter - 26
-      ).toFixed(1)}px, rgba(120, 9, 24, 0.75) ${Math.max(0, ringCenter - 10).toFixed(
-        1
-      )}px, rgba(255, 90, 110, 0.98) ${ringCenter.toFixed(1)}px, rgba(239, 35, 60, 0.6) ${(
-        ringCenter + 10
-      ).toFixed(1)}px, transparent ${(ringCenter + 30).toFixed(1)}px)`
-    : undefined;
+  // Tepi lensa: amber (warna mata Belial) di garis terluar, merah di dalamnya
+  const edgeGradient = `radial-gradient(circle at ${ox}px ${oy}px,
+    transparent ${Math.max(0, radius - 40).toFixed(1)}px,
+    rgba(217, 4, 41, 0.55) ${Math.max(0, radius - 12).toFixed(1)}px,
+    rgba(255, 176, 32, 0.95) ${radius.toFixed(1)}px,
+    rgba(239, 35, 60, 0) ${(radius + 14).toFixed(1)}px)`;
 
-  const flashStrength = Math.max(0, 1 - Math.abs(progress - 0.3) / 0.24);
-  const flashRadius = Math.max(60, W * 0.7);
-
-  const warpScale = !reducedMotion && morphing ? 44 * Math.sin(Math.PI * progress) : 0;
-  const useWarp = warpScale > 0.8;
-
-  const wrapperStyle: React.CSSProperties = {
-    left: -mx,
-    top: -my,
-    width: W + mx * 2,
-    height: H + my * 2,
-  };
-
-  const innerStyle: React.CSSProperties = {
-    left: mx,
-    top: my,
-    width: W,
-    height: H,
-  };
+  const settled = Math.pow(Math.max(0, (progress - 0.85) / 0.15), 2);
+  const eyeX = placement.left + placement.width * BELIAL_EYES.x;
+  const eyeY = placement.top + placement.height * BELIAL_EYES.y;
+  const orbX = placement.left + placement.width * BELIAL_ORB.x;
+  const orbY = placement.top + placement.height * BELIAL_ORB.y;
+  const glowSize = placement.width * 0.34;
 
   return (
     <>
-      {/* Filter distorsi energi untuk tepi sapuan */}
-      <svg aria-hidden="true" width="0" height="0" className="absolute pointer-events-none">
-        <defs>
-          <filter id={warpFilterId} x="-20%" y="-20%" width="140%" height="140%">
-            <feTurbulence
-              type="fractalNoise"
-              baseFrequency="0.012 0.03"
-              numOctaves="2"
-              seed="5"
-              result="warpNoise"
-            />
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="warpNoise"
-              scale={warpScale}
-              xChannelSelector="R"
-              yChannelSelector="G"
-            />
-          </filter>
-        </defs>
-      </svg>
+      {warping && (
+        <svg aria-hidden="true" width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none' }}>
+          <defs>
+            <filter id={warpId} x="-40%" y="-20%" width="180%" height="140%" colorInterpolationFilters="sRGB">
+              <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="11" result="n">
+                <animate
+                  attributeName="baseFrequency"
+                  dur="1s"
+                  values="0.012 0.02;0.018 0.028;0.012 0.02"
+                  repeatCount="indefinite"
+                />
+              </feTurbulence>
+              <feDisplacementMap in="SourceGraphic" in2="n" scale={warpScale.toFixed(1)} xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+          </defs>
+        </svg>
+      )}
 
-      {/* LAPISAN MANUSIA: meluruh dari titik kursor */}
-      {!full && (
-        <div
-          className="absolute z-30 pointer-events-none"
+      <div
+        className="absolute inset-0 z-30 pointer-events-none"
+        style={{ filter: warping ? `url(#${warpId})` : undefined }}
+      >
+        {progress > 0.004 && (
+          <img
+            src={belialUrl}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            className="absolute max-w-none select-none"
+            style={{
+              left: `${placement.left.toFixed(1)}px`,
+              top: `${placement.top.toFixed(1)}px`,
+              width: `${placement.width.toFixed(1)}px`,
+              height: `${placement.height.toFixed(1)}px`,
+              maskImage: belialMask,
+              WebkitMaskImage: belialMask,
+              filter:
+                'drop-shadow(0 0 1.5px rgba(255, 150, 90, 0.85)) drop-shadow(0 0 20px rgba(217, 4, 41, 0.5)) drop-shadow(0 10px 26px rgba(0, 0, 0, 0.9))',
+            }}
+          />
+        )}
+
+        <img
+          src={humanUrl}
+          alt={humanAlt}
+          draggable={false}
+          className="absolute inset-0 w-full h-full object-contain select-none"
           style={{
-            ...wrapperStyle,
             maskImage: humanMask,
             WebkitMaskImage: humanMask,
-          }}
-        >
-          <div className="absolute" style={innerStyle}>
-            <img
-              src={humanUrl}
-              alt={humanAlt}
-              draggable={false}
-              className="w-full h-full object-contain select-none"
-              style={{
-                filter:
-                  progress > 0.01
-                    ? `brightness(${(1 - progress * 0.35).toFixed(2)}) saturate(${(1 - progress * 0.4).toFixed(2)})`
-                    : undefined,
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* LAPISAN BELIAL: muncul di dalam lingkaran sapuan, rim-light crimson */}
-      {progress > 0.003 && layout && (
-        <div
-          className="absolute z-[32] pointer-events-none"
-          style={{
-            ...wrapperStyle,
-            maskImage: belialMask,
-            WebkitMaskImage: belialMask,
-          }}
-        >
-          <div className="absolute" style={innerStyle}>
-            <div
-              className="absolute"
-              style={{
-                left: `${layout.leftPct}%`,
-                top: `${layout.topPct}%`,
-                width: `${layout.widthPct}%`,
-                height: `${layout.heightPct}%`,
-                filter: useWarp ? `url(#${warpFilterId})` : undefined,
-              }}
-            >
-              <img
-                src={belialUrl}
-                alt="Wujud Belial, Dark Galactic Emperor"
-                draggable={false}
-                className="w-full h-full object-contain select-none"
-                style={{
-                  filter:
-                    'drop-shadow(0 0 5px rgba(239, 35, 60, 0.85)) drop-shadow(0 0 22px rgba(239, 35, 60, 0.45)) drop-shadow(0 10px 18px rgba(0, 0, 0, 0.8))',
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* CINCIN KEJUT CRIMSON + KILATAN di titik asal sapuan */}
-      {ringVisible && (
-        <div
-          className="absolute z-[34] pointer-events-none"
-          style={{
-            ...wrapperStyle,
-            background: ringBackground,
-            opacity: ringStrength,
-            mixBlendMode: 'screen',
+            filter:
+              progress > 0.01
+                ? `brightness(${(1 - progress * 0.32).toFixed(2)}) saturate(${(1 + progress * 0.4).toFixed(2)})`
+                : undefined,
           }}
         />
-      )}
-      {morphing && flashStrength > 0.01 && (
+
+        {/* Mata amber dan batu dada ungu: baru menyala setelah wujud selesai */}
+        {settled > 0.01 && (
+          <>
+            <div
+              className={reducedMotion ? '' : 'belial-eye-pulse'}
+              style={{
+                position: 'absolute',
+                left: `${(eyeX - glowSize / 2).toFixed(1)}px`,
+                top: `${(eyeY - glowSize / 2).toFixed(1)}px`,
+                width: `${glowSize.toFixed(1)}px`,
+                height: `${glowSize.toFixed(1)}px`,
+                background: 'radial-gradient(circle, rgba(255, 176, 32, 0.55) 0%, rgba(255, 120, 20, 0.18) 40%, transparent 70%)',
+                mixBlendMode: 'screen',
+                opacity: settled,
+              }}
+            />
+            <div
+              className={reducedMotion ? '' : 'belial-orb-pulse'}
+              style={{
+                position: 'absolute',
+                left: `${(orbX - glowSize * 0.4).toFixed(1)}px`,
+                top: `${(orbY - glowSize * 0.4).toFixed(1)}px`,
+                width: `${(glowSize * 0.8).toFixed(1)}px`,
+                height: `${(glowSize * 0.8).toFixed(1)}px`,
+                background: 'radial-gradient(circle, rgba(181, 92, 255, 0.6) 0%, rgba(120, 40, 200, 0.2) 45%, transparent 70%)',
+                mixBlendMode: 'screen',
+                opacity: settled,
+              }}
+            />
+          </>
+        )}
+      </div>
+
+      {/* Tepi lensa hanya menyala di atas tubuh sosok */}
+      {progress > 0.004 && progress < 0.99 && (
         <div
-          className="absolute z-[34] pointer-events-none"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[36]"
           style={{
-            ...wrapperStyle,
-            background: `radial-gradient(circle ${flashRadius.toFixed(0)}px at ${ox.toFixed(1)}px ${oy.toFixed(
-              1
-            )}px, rgba(255, 90, 110, 0.85) 0%, rgba(239, 35, 60, 0.38) 38%, transparent 100%)`,
-            opacity: flashStrength * 0.8,
+            backgroundImage: edgeGradient,
+            opacity: edgeStrength,
+            maskImage: `url("${humanUrl}")`,
+            WebkitMaskImage: `url("${humanUrl}")`,
+            maskSize: '100% 100%',
+            WebkitMaskSize: '100% 100%',
+            maskRepeat: 'no-repeat',
+            WebkitMaskRepeat: 'no-repeat',
             mixBlendMode: 'screen',
           }}
         />
@@ -320,37 +254,85 @@ export const BelialMorphStage: React.FC<MorphStageProps> = ({
   );
 };
 
-/**
- * Retakan energi merah di trotoar sekitar kaki saat wujud Belial aktif
- */
-export const BelialCityCracks: React.FC<{ progress: number }> = ({ progress }) => {
-  if (progress <= 0.05) return null;
+/* ------------------------------------------------------------------ */
+/* Kabut energi di belakang Belial                                      */
+/* ------------------------------------------------------------------ */
+
+export const BelialAura: React.FC<{
+  progress: number;
+  placement: BelialPlacement;
+  reducedMotion: boolean;
+}> = ({ progress, placement, reducedMotion }) => {
+  const uid = useId().replace(/:/g, '');
+  const fogId = `belial-fog-${uid}`;
+  if (progress <= 0.01) return null;
+
+  const { left, top, width, height } = placement;
+  const cx = left + width / 2;
+
   return (
-    <svg
+    <div
       aria-hidden="true"
-      viewBox="0 0 240 60"
-      className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 w-[150%] h-[18%] z-[18]"
+      className="pointer-events-none absolute inset-0 z-20 overflow-visible"
       style={{ opacity: Math.min(1, progress * 1.1) }}
     >
-      <defs>
-        <radialGradient id="crackFloorGlow" cx="50%" cy="55%" r="50%">
-          <stop offset="0%" stopColor="#EF233C" stopOpacity="0.45" />
-          <stop offset="65%" stopColor="#7A0918" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="#080507" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <ellipse cx="120" cy="36" rx="98" ry="20" fill="url(#crackFloorGlow)" />
-      <g fill="none" stroke="#FF5A6E" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M 120 34 L 94 38 L 76 46 L 52 49" strokeWidth="1.2" opacity="0.88" />
-        <path d="M 120 34 L 148 37 L 172 45 L 196 48" strokeWidth="1.2" opacity="0.88" />
-        <path d="M 118 35 L 105 49 L 92 56" strokeWidth="0.95" opacity="0.72" />
-        <path d="M 124 35 L 138 48 L 154 55" strokeWidth="0.95" opacity="0.72" />
-        <path d="M 94 38 L 84 31 L 68 29" strokeWidth="0.8" opacity="0.6" />
-        <path d="M 148 37 L 160 30 L 178 28" strokeWidth="0.8" opacity="0.6" />
-      </g>
-    </svg>
+      {!reducedMotion && (
+        <svg aria-hidden="true" width="0" height="0" style={{ position: 'absolute' }}>
+          <defs>
+            <filter id={fogId} x="-40%" y="-30%" width="180%" height="160%" colorInterpolationFilters="sRGB">
+              <feTurbulence type="fractalNoise" baseFrequency="0.008 0.014" numOctaves="3" seed="7" result="fn">
+                <animate attributeName="baseFrequency" dur="8s" values="0.008 0.014;0.012 0.02;0.008 0.014" repeatCount="indefinite" />
+              </feTurbulence>
+              <feDisplacementMap in="SourceGraphic" in2="fn" scale={(24 + progress * 50).toFixed(1)} xChannelSelector="R" yChannelSelector="G" />
+              <feGaussianBlur stdDeviation="3" />
+            </filter>
+          </defs>
+        </svg>
+      )}
+
+      <div
+        className="absolute"
+        style={{
+          left: `${(cx - width * 0.9).toFixed(1)}px`,
+          top: `${(top + height * 0.02).toFixed(1)}px`,
+          width: `${(width * 1.8).toFixed(1)}px`,
+          height: `${height.toFixed(1)}px`,
+          filter: reducedMotion ? undefined : `url(#${fogId})`,
+          background: [
+            'radial-gradient(ellipse 30% 30% at 30% 40%, rgba(7, 4, 8, 0.95) 0%, transparent 100%)',
+            'radial-gradient(ellipse 30% 32% at 70% 44%, rgba(7, 4, 8, 0.95) 0%, transparent 100%)',
+            'radial-gradient(ellipse 42% 26% at 50% 72%, rgba(80, 6, 18, 0.9) 0%, transparent 100%)',
+            'radial-gradient(ellipse 34% 24% at 50% 16%, rgba(120, 10, 26, 0.65) 0%, transparent 100%)',
+          ].join(', '),
+        }}
+      />
+
+      {/* Genangan cahaya merah di bawah kaki */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          left: `${(cx - width * 0.6).toFixed(1)}px`,
+          top: `${(placement.feetY - height * 0.04).toFixed(1)}px`,
+          width: `${(width * 1.2).toFixed(1)}px`,
+          height: `${(height * 0.08).toFixed(1)}px`,
+          background: 'radial-gradient(ellipse at 50% 50%, rgba(217, 4, 41, 0.6) 0%, rgba(120, 8, 22, 0.25) 50%, transparent 76%)',
+          filter: 'blur(6px)',
+        }}
+      />
+    </div>
   );
 };
+
+/* ------------------------------------------------------------------ */
+/* Bara api yang naik dari trotoar                                      */
+/* ------------------------------------------------------------------ */
+
+export interface EmberZone {
+  cx: number;
+  halfWidth: number;
+  floorY: number;
+  bodyHeight: number;
+}
 
 interface EmberParticle {
   x: number;
@@ -363,33 +345,27 @@ interface EmberParticle {
   hue: string;
 }
 
-/**
- * Kanvas 2D partikel bara api yang naik dari lantai di sekitar kaki figur,
- * plus kilat energi merah-hitam (maksimum 120 partikel).
- * Berhenti otomatis ketika fase bukan hero, tab tersembunyi, atau reducedMotion aktif.
- */
 export const BelialEmberCanvas: React.FC<{
   active: boolean;
   progress: number;
   tabVisible: boolean;
   reducedMotion: boolean;
-  anchorRef: React.RefObject<HTMLElement | null>;
-}> = ({ active, progress, tabVisible, reducedMotion, anchorRef }) => {
+  zone: EmberZone | null;
+}> = ({ active, progress, tabVisible, reducedMotion, zone }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const progressRef = useRef(progress);
-  const wakeLoopRef = useRef<(() => void) | null>(null);
+  const zoneRef = useRef<EmberZone | null>(zone);
+  const wakeRef = useRef<(() => void) | null>(null);
   progressRef.current = progress;
+  zoneRef.current = zone;
 
   useEffect(() => {
-    if (progress > 0.01) {
-      wakeLoopRef.current?.();
-    }
+    if (progress > 0.01) wakeRef.current?.();
   }, [progress]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !active || !tabVisible || reducedMotion) return;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -406,87 +382,36 @@ export const BelialEmberCanvas: React.FC<{
     };
     resize();
 
-    // Area figur dalam piksel kanvas (kanvas menutupi seluruh viewport)
-    const readAnchor = () => {
-      const el = anchorRef.current;
-      if (el) {
-        const r = el.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) {
-          return { left: r.left, top: r.top, w: r.width, h: r.height };
-        }
-      }
-      return { left: width * 0.3, top: height * 0.1, w: width * 0.4, h: height * 0.8 };
-    };
-    let anchor = readAnchor();
-
     const particles: EmberParticle[] = [];
-    const MAX_PARTICLES = 120;
-    let rafId = 0;
-    let boltCooldown = 0;
-    let frameCount = 0;
+    const MAX = 110;
+    let raf = 0;
 
-    const spawnEmber = (pScale: number) => {
-      if (particles.length >= MAX_PARTICLES) return;
-      const palette = ['#EF233C', '#FF5A6E', '#FDBA74'];
-      // Bara naik dari lantai/trotoar tepat di sekitar kaki
-      const footY = anchor.top + anchor.h * (0.93 + Math.random() * 0.06);
+    const zoneNow = (): EmberZone =>
+      zoneRef.current ?? { cx: width * 0.7, halfWidth: width * 0.14, floorY: height * 0.92, bodyHeight: height * 0.7 };
+
+    const spawn = (pScale: number) => {
+      if (particles.length >= MAX) return;
+      const z = zoneNow();
+      const palette = ['#EF233C', '#FF7A3D', '#FFB020'];
       particles.push({
-        x: anchor.left + anchor.w * (0.5 + (Math.random() - 0.5) * 1.0),
-        y: footY,
+        x: z.cx + (Math.random() - 0.5) * z.halfWidth * 2.2,
+        y: z.floorY - Math.random() * z.bodyHeight * 0.08,
         vx: (Math.random() - 0.5) * 0.7,
-        vy: -(0.9 + Math.random() * 2.2 * (0.5 + pScale)),
-        size: 1.2 + Math.random() * 2.4,
-        alpha: 0.6 + Math.random() * 0.4,
-        decay: 0.004 + Math.random() * 0.008,
+        vy: -(0.8 + Math.random() * 2.0 * (0.5 + pScale)),
+        size: 1 + Math.random() * 2.2,
+        alpha: 0.55 + Math.random() * 0.45,
+        decay: 0.006 + Math.random() * 0.011,
         hue: palette[Math.floor(Math.random() * palette.length)],
       });
-    };
-
-    const drawLightningArc = (pScale: number) => {
-      const startX = anchor.left + anchor.w * (0.1 + Math.random() * 0.8);
-      const startY = anchor.top + anchor.h * (0.5 + Math.random() * 0.4);
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      let cx = startX;
-      let cy = startY;
-      const segments = 4 + Math.floor(Math.random() * 3);
-      for (let i = 0; i < segments; i++) {
-        cx += (Math.random() - 0.5) * 34;
-        cy -= 12 + Math.random() * 22;
-        ctx.lineTo(cx, cy);
-      }
-      ctx.strokeStyle = `rgba(255, 90, 110, ${(0.42 * pScale).toFixed(2)})`;
-      ctx.lineWidth = 1.6;
-      ctx.shadowColor = '#EF233C';
-      ctx.shadowBlur = 10;
-      ctx.stroke();
-
-      ctx.strokeStyle = `rgba(8, 8, 12, ${(0.65 * pScale).toFixed(2)})`;
-      ctx.lineWidth = 0.7;
-      ctx.shadowBlur = 0;
-      ctx.stroke();
-      ctx.restore();
     };
 
     const tick = () => {
       const p = progressRef.current;
       ctx.clearRect(0, 0, width, height);
 
-      frameCount++;
-      if (frameCount % 20 === 0) anchor = readAnchor();
-
       if (p > 0.06) {
-        const spawnCount = Math.min(4, Math.ceil(p * 3));
-        for (let i = 0; i < spawnCount; i++) {
-          if (Math.random() < 0.72) spawnEmber(p);
-        }
-
-        boltCooldown--;
-        if (p > 0.45 && boltCooldown <= 0 && Math.random() < 0.14) {
-          drawLightningArc(p);
-          boltCooldown = 14 + Math.floor(Math.random() * 18);
-        }
+        const n = Math.min(4, Math.ceil(p * 3));
+        for (let i = 0; i < n; i++) if (Math.random() < 0.7) spawn(p);
       }
 
       for (let i = particles.length - 1; i >= 0; i--) {
@@ -494,12 +419,10 @@ export const BelialEmberCanvas: React.FC<{
         pt.x += pt.vx + Math.sin(pt.y * 0.03) * 0.25;
         pt.y += pt.vy;
         pt.alpha -= pt.decay;
-
         if (pt.alpha <= 0.02 || pt.y < -12) {
           particles.splice(i, 1);
           continue;
         }
-
         ctx.globalAlpha = Math.max(0, pt.alpha * Math.max(0.25, p));
         ctx.fillStyle = pt.hue;
         ctx.beginPath();
@@ -508,40 +431,25 @@ export const BelialEmberCanvas: React.FC<{
       }
       ctx.globalAlpha = 1;
 
-      if (p > 0.01 || particles.length > 0) {
-        rafId = window.requestAnimationFrame(tick);
-      } else {
-        rafId = 0;
-      }
+      raf = p > 0.01 || particles.length > 0 ? window.requestAnimationFrame(tick) : 0;
     };
 
-    const ensureRunning = () => {
-      if (!rafId) {
-        rafId = window.requestAnimationFrame(tick);
-      }
+    wakeRef.current = () => {
+      if (!raf) raf = window.requestAnimationFrame(tick);
     };
-    wakeLoopRef.current = ensureRunning;
+    if (progressRef.current > 0.01) wakeRef.current();
 
-    if (progressRef.current > 0.01) {
-      ensureRunning();
-    }
-
-    const onResize = () => {
-      resize();
-      anchor = readAnchor();
-    };
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onResize) : null;
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
     ro?.observe(canvas);
 
     return () => {
-      wakeLoopRef.current = null;
-      if (rafId) window.cancelAnimationFrame(rafId);
+      wakeRef.current = null;
+      if (raf) window.cancelAnimationFrame(raf);
       ro?.disconnect();
     };
-  }, [active, tabVisible, reducedMotion, anchorRef]);
+  }, [active, tabVisible, reducedMotion]);
 
   if (!active || reducedMotion) return null;
-
   return (
     <canvas
       ref={canvasRef}

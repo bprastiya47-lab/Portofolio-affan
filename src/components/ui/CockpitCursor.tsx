@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 interface CockpitCursorProps {
   overFrame: boolean;
@@ -18,6 +18,7 @@ export const CockpitCursor: React.FC<CockpitCursorProps> = ({
   reducedMotion,
 }) => {
   const cursorRef = useRef<HTMLDivElement>(null);
+  const posRef = useRef({ x: -100, y: -100 });
   const [isFinePointer, setIsFinePointer] = useState(false);
   const [visible, setVisible] = useState(false);
   const [overButton, setOverButton] = useState(false);
@@ -42,6 +43,7 @@ export const CockpitCursor: React.FC<CockpitCursorProps> = ({
         setVisible(false);
         return;
       }
+      posRef.current = { x: e.clientX, y: e.clientY };
       setVisible(true);
       if (cursorRef.current) {
         cursorRef.current.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
@@ -65,6 +67,14 @@ export const CockpitCursor: React.FC<CockpitCursorProps> = ({
       window.removeEventListener('touchstart', onTouchStart);
     };
   }, [isFinePointer, disabled]);
+
+  // Saat elemen kursor baru dipasang (gerakan pertama), ref masih kosong: terapkan posisi terakhir
+  // agar lingkaran tidak tertinggal di pojok kiri atas layar.
+  useLayoutEffect(() => {
+    if (visible && cursorRef.current) {
+      cursorRef.current.style.transform = `translate3d(${posRef.current.x}px, ${posRef.current.y}px, 0)`;
+    }
+  }, [visible, isFinePointer, disabled]);
 
   if (!isFinePointer || disabled || !visible) return null;
 

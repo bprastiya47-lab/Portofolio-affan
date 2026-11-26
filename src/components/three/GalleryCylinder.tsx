@@ -197,8 +197,8 @@ function createViewfinderTexture(item: PortfolioItem): THREE.CanvasTexture {
   // Empat sudut braket tipis viewfinder
   const m = 34;
   const bLen = 54;
-  ctx.strokeStyle = '#EF233C';
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(239, 231, 225, 0.92)';
+  ctx.lineWidth = 3;
   ctx.lineCap = 'square';
   ctx.beginPath();
   // Kiri atas
@@ -257,7 +257,7 @@ function createViewfinderTexture(item: PortfolioItem): THREE.CanvasTexture {
   // Label AF & nomor frame di kiri atas
   ctx.fillStyle = 'rgba(8, 5, 7, 0.78)';
   ctx.fillRect(m + 14, m + 12, 210, 32);
-  ctx.fillStyle = '#EF233C';
+  ctx.fillStyle = '#FFB020';
   ctx.font = '600 18px "IBM Plex Mono", monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
@@ -273,11 +273,11 @@ function createViewfinderTexture(item: PortfolioItem): THREE.CanvasTexture {
 
   ctx.fillStyle = 'rgba(8, 5, 7, 0.84)';
   ctx.fillRect(pillX, pillY, pillW, 38);
-  ctx.strokeStyle = 'rgba(239, 35, 60, 0.45)';
+  ctx.strokeStyle = 'rgba(255, 176, 32, 0.5)';
   ctx.lineWidth = 1.5;
   ctx.strokeRect(pillX, pillY, pillW, 38);
 
-  ctx.fillStyle = '#F6EEF0';
+  ctx.fillStyle = '#EFE7E1';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(shotLine, cx, pillY + 19);
@@ -335,15 +335,12 @@ const CARD_FRAGMENT_SHADER = /* glsl */ `
     vec3 photoCol = sampleBlurred(uMap, vUv, activeBlur);
     vec3 finalCol = mix(lqipCol, photoCol, uMix);
 
-    // Efek villain: crimson scan-line dan glow tepi merah pekat saat hover / tepat di tengah
+    // Frame yang disorot: foto tidak diwarnai atau digaris-garisi; hanya sedikit lebih terang
+    // dengan garis tepi amber setipis kawat (warna mata Belial). Frame lain diredupkan tipis.
     float edgeD = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
-    float edgeGlow = smoothstep(0.075, 0.0, edgeD);
-    float scanPos = fract(uTime * 0.26);
-    float scanBand = smoothstep(0.04, 0.0, abs(vUv.y - scanPos));
-    float scanLines = 0.5 + 0.5 * sin(vUv.y * 360.0);
-    vec3 crimson = vec3(0.937, 0.137, 0.235);
-    finalCol = mix(finalCol, finalCol * vec3(1.0, 0.8, 0.82), uHot * 0.28);
-    finalCol += crimson * (edgeGlow * 0.95 + scanBand * 0.5 + scanLines * 0.035) * uHot;
+    float hairline = smoothstep(0.011, 0.004, edgeD);
+    finalCol *= mix(0.8, 1.04, uHot);
+    finalCol = mix(finalCol, vec3(1.0, 0.69, 0.13), hairline * uHot * 0.92);
 
     // Pudarkan tipis jika bagian atas frame mendekati zona aman judul hero saat mode karusel
     float safeFade = 1.0 - smoothstep(2.55, 2.85, vWorldY) * (1.0 - uInspectMix);
@@ -1332,7 +1329,7 @@ export const GalleryCylinder: React.FC<GalleryCylinderProps> = ({
             alphaMap={deckAlphaMask}
             transparent
             depthWrite={false}
-            color="#1A0A0F"
+            color="#0C0710"
             roughness={0.28}
             metalness={0.68}
           />
@@ -1346,7 +1343,7 @@ export const GalleryCylinder: React.FC<GalleryCylinderProps> = ({
             depthScale={0.85}
             minDepthThreshold={0.4}
             maxDepthThreshold={1.4}
-            color="#160810"
+            color="#0C0710"
             metalness={0.6}
             map={apronTexture}
             alphaMap={deckAlphaMask}

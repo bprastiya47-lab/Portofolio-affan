@@ -4,6 +4,9 @@ const MAX_CONCURRENT_VOICES = 6;
 const HOVER_THROTTLE_MS = 60;
 const CROSSFADE_SECONDS = 1.5;
 
+/** Backsound utama: medley Ultraman Belial (ditaruh di public/assets/audio/) */
+const BGM_URL = '/assets/audio/belial-bgm.mp3';
+
 type SceneAudioMode = 'none' | 'intro' | 'hero' | 'gallery';
 
 const optionalAmbientAssets = import.meta.glob('/src/assets/audio/ambient.mp3', {
@@ -18,7 +21,10 @@ function jitter(base: number, ratio = 0.05): number {
 
 function readStoredEnabled(): boolean {
   try {
-    return typeof window !== 'undefined' && window.localStorage.getItem(AUDIO_ENABLED_KEY) === 'true';
+    if (typeof window === 'undefined') return false;
+    const stored = window.localStorage.getItem(AUDIO_ENABLED_KEY);
+    // Pengunjung baru: musik menyala begitu ada gestur pertama (kebijakan autoplay browser)
+    return stored === null ? true : stored === 'true';
   } catch {
     return false;
   }
@@ -116,6 +122,15 @@ class AviationAudioEngine {
 
   private pinkBuffer: AudioBuffer | null = null;
 
+  // Backsound medley (HTMLAudioElement -> lowpass -> gain -> backsoundBus)
+  private bgmEl: HTMLAudioElement | null = null;
+  private bgmSource: MediaElementAudioSourceNode | null = null;
+  private bgmFilter: BiquadFilterNode | null = null;
+  private bgmGain: GainNode | null = null;
+  private bgmFailed = false;
+  private bgmWanted = false;
+  private bgmPauseTimer = 0;
+
   private enabled: boolean = readStoredEnabled();
   private masterVolume: number = readStoredVolume();
   private tabVisible = typeof document !== 'undefined' ? !document.hidden : true;
@@ -161,6 +176,7 @@ class AviationAudioEngine {
       }
     } else {
       this.applyMasterGain(0.08);
+      this.fadeOutBgm(0.12);
       this.teardownIntroNodes(0.12);
       this.teardownHeroNodes(0.12);
       this.teardownGalleryNodes(0.12);
@@ -186,12 +202,18 @@ class AviationAudioEngine {
       if (this.galleryAmbientEl && !this.galleryAmbientEl.paused) {
         this.galleryAmbientEl.pause();
       }
+      if (this.bgmEl && !this.bgmEl.paused) {
+        this.bgmEl.pause();
+      }
     } else if (this.enabled) {
       if (this.ctx.state === 'suspended') {
         void this.ctx.resume().catch(() => {});
       }
       if (this.galleryAmbientEl && this.galleryActive) {
         void this.galleryAmbientEl.play().catch(() => {});
+      }
+      if (this.bgmEl && this.bgmWanted) {
+        void this.bgmEl.play().catch(() => {});
       }
       this.applyMasterGain(0.2);
       this.syncActiveBacksound();
@@ -266,21 +288,150 @@ class AviationAudioEngine {
 
     if (this.sceneMode === 'intro') {
       this.startIntroBacksound(ctx);
+      this.fadeOutBgm(CROSSFADE_SECONDS);
       this.fadeOutHero(CROSSFADE_SECONDS);
       this.fadeOutGallery(CROSSFADE_SECONDS);
     } else if (this.sceneMode === 'hero') {
-      this.startHeroBacksound(ctx);
+      // Medley menjadi backsound utama; bed prosedural hanya cadangan bila file gagal dimuat
+      if (this.startBgm(ctx)) {
+        this.fadeOutHero(CROSSFADE_SECONDS);
+      } else {
+        this.startHeroBacksound(ctx);
+      }
       this.fadeOutIntro(CROSSFADE_SECONDS);
       this.fadeOutGallery(CROSSFADE_SECONDS);
     } else if (this.sceneMode === 'gallery') {
-      this.startGalleryBacksound(ctx);
+      if (this.startBgm(ctx)) {
+        this.fadeOutGallery(CROSSFADE_SECONDS);
+      } else {
+        this.startGalleryBacksound(ctx);
+      }
       this.fadeOutIntro(CROSSFADE_SECONDS);
       this.fadeOutHero(CROSSFADE_SECONDS);
     } else {
+      this.fadeOutBgm(0.35);
       this.fadeOutIntro(0.35);
       this.fadeOutHero(0.35);
       this.fadeOutGallery(0.35);
     }
+  }
+
+  /** Menyalakan medley; false bila file tidak bisa dimuat (pemanggil memakai bed prosedural) */
+  private startBgm(ctx: AudioContext): boolean {
+    if (this.bgmFailed || !this.backsoundBus) return false;
+    this.bgmWanted = true;
+    if (this.bgmPauseTimer) {
+      window.clearTimeout(this.bgmPauseTimer);
+      this.bgmPauseTimer = 0;
+    }
+
+    if (!this.bgmEl) {
+      const el = new Audio(BGM_URL);
+      el.loop = true;
+      el.preload = 'auto';
+      el.addEventListener('error', () => {
+        this.bgmFailed = true;
+        this.teardownBgm();
+        if (this.enabled && this.hasUserGesture && this.tabVisible) {
+          this.syncActiveBacksound();
+        }
+      });
+
+      let source: MediaElementAudioSourceNode;
+      try {
+        source = ctx.createMediaElementSource(el);
+      } catch {
+        this.bgmFailed = true;
+        return false;
+      }
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.value = 0.6;
+      filter.frequency.value = 2200;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001;
+
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.backsoundBus);
+
+      this.bgmEl = el;
+      this.bgmSource = source;
+      this.bgmFilter = filter;
+      this.bgmGain = gain;
+    }
+
+    if (this.bgmEl && this.bgmEl.paused) {
+      void this.bgmEl.play().catch(() => {});
+    }
+    this.applyBgmMood(CROSSFADE_SECONDS);
+    return true;
+  }
+
+  /**
+   * Warna musik mengikuti adegan: di Hero tertahan (lowpass) sampai Belial bangkit,
+   * lalu terbuka penuh; di Galeri terang dan lebih pelan agar foto tetap jadi pusat perhatian.
+   */
+  private applyBgmMood(rampSec: number): void {
+    if (!this.ctx || !this.bgmGain || !this.bgmFilter) return;
+    const now = this.ctx.currentTime;
+    let gain = 0.0001;
+    let cutoff = 2200;
+    if (this.bgmWanted && this.enabled && this.tabVisible) {
+      if (this.sceneMode === 'hero') {
+        const p = this.heroProgress;
+        const curve = p * p * (3 - 2 * p);
+        gain = 0.46 + 0.5 * curve;
+        cutoff = 1700 + 15000 * curve;
+      } else {
+        gain = 0.68;
+        cutoff = 9000;
+      }
+    }
+    const tc = Math.max(0.03, rampSec / 3);
+    this.bgmGain.gain.cancelScheduledValues(now);
+    this.bgmGain.gain.setTargetAtTime(gain, now, tc);
+    this.bgmFilter.frequency.cancelScheduledValues(now);
+    this.bgmFilter.frequency.setTargetAtTime(cutoff, now, tc);
+  }
+
+  private fadeOutBgm(fadeSec: number): void {
+    if (!this.bgmEl) {
+      this.bgmWanted = false;
+      return;
+    }
+    this.bgmWanted = false;
+    this.applyBgmMood(fadeSec);
+    if (this.bgmPauseTimer) window.clearTimeout(this.bgmPauseTimer);
+    this.bgmPauseTimer = window.setTimeout(() => {
+      this.bgmPauseTimer = 0;
+      if (!this.bgmWanted && this.bgmEl) this.bgmEl.pause();
+    }, Math.round(fadeSec * 1000) + 120);
+  }
+
+  private teardownBgm(): void {
+    this.bgmWanted = false;
+    if (this.bgmPauseTimer) {
+      window.clearTimeout(this.bgmPauseTimer);
+      this.bgmPauseTimer = 0;
+    }
+    const el = this.bgmEl;
+    this.bgmEl = null;
+    if (el) {
+      el.pause();
+      el.removeAttribute('src');
+      el.load();
+    }
+    try {
+      this.bgmSource?.disconnect();
+      this.bgmFilter?.disconnect();
+      this.bgmGain?.disconnect();
+    } catch {
+      // Abaikan node yang sudah terputus
+    }
+    this.bgmSource = null;
+    this.bgmFilter = null;
+    this.bgmGain = null;
   }
 
   private startIntroBacksound(ctx: AudioContext): void {
@@ -732,6 +883,9 @@ class AviationAudioEngine {
   public setHeroBelialProgress(progress: number): void {
     const p = Math.max(0, Math.min(1, progress));
     this.heroProgress = p;
+    if (this.bgmWanted && this.sceneMode === 'hero') {
+      this.applyBgmMood(0.2);
+    }
     if (!this.enabled || !this.tabVisible || !this.heroActive || !this.ctx) return;
     const now = this.ctx.currentTime;
     const curve = p * p * (3 - 2 * p);
@@ -1267,6 +1421,7 @@ class AviationAudioEngine {
   }
 
   public dispose(): void {
+    this.teardownBgm();
     this.teardownIntroNodes(0);
     this.teardownHeroNodes(0);
     this.teardownGalleryNodes(0);
