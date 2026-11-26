@@ -388,9 +388,9 @@ export const HeroProfile: React.FC<HeroProfileProps> = ({
   const figWarp = warpOut ? ' translateY(4%) scale(1.42)' : '';
 
   const instructionDesktop =
-    'Gulir ke bawah untuk masuk galeri';
+    'Arahkan kursor ke sosok untuk memanggil wujud Belial • Gulir ke bawah untuk masuk galeri';
   const instructionMobile =
-    'Geser ke atas untuk masuk galeri';
+    'Ketuk sosok atau Ubah Wujud untuk memanggil Belial • Geser ke atas untuk masuk galeri';
 
   return (
     <section
