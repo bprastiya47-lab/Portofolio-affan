@@ -5,6 +5,8 @@ export type VehicleArchetype =
   | 'quad-747'
   | 'locomotive-cc206';
 
+export type PortfolioCategory = 'pesawat' | 'kereta';
+
 export interface LiveryStyle {
   fuselage: string;
   belly: string;
@@ -16,12 +18,23 @@ export interface LiveryStyle {
   registration: string;
   titleText: string;
   variant?: '777' | '787' | 'a350' | 'a330' | 'a380' | '747' | 'cn295' | 'cc206';
-  pattern?: 'korean' | 'garuda' | 'garuda-retro' | 'emirates' | 'thai' | 'anz' | 'cargolux' | 'mclaren' | 'camo' | 'kai';
+  pattern?:
+    | 'korean'
+    | 'garuda'
+    | 'garuda-retro'
+    | 'emirates'
+    | 'thai'
+    | 'anz'
+    | 'cargolux'
+    | 'mclaren'
+    | 'camo'
+    | 'kai';
 }
 
 export interface PortfolioItem {
   id: string;
   indexLabel: string;
+  category: PortfolioCategory;
   aircraft: string;
   operator: string;
   registration: string;
@@ -34,6 +47,9 @@ export interface PortfolioItem {
   liveryDesc: string;
   specialBadge?: string;
   imageUrl: string;
+  thumbUrl: string;
+  srcSet: string;
+  blurDataUrl: string;
   archetype: VehicleArchetype;
   livery: LiveryStyle;
   notes: string;
@@ -43,6 +59,7 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
   {
     id: 'ke-b777',
     indexLabel: '01',
+    category: 'pesawat',
     aircraft: 'Boeing 777-300ER',
     operator: 'Korean Air',
     registration: 'HL8209',
@@ -52,8 +69,12 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
     iso: '200',
     focalLength: '420mm',
     location: 'CGK · Approach RWY 25R',
-    liveryDesc: 'Blue/White Twin-Engine',
-    imageUrl: '/assets/aistudio/IMG_1061__2_.jpg_b7ad7ee3.jpeg',
+    liveryDesc: 'Biru Langit / Putih Twin-Engine',
+    imageUrl: '/assets/gallery/ke-b777-2000.webp',
+    thumbUrl: '/assets/gallery/ke-b777-800.webp',
+    srcSet: '/assets/gallery/ke-b777-800.webp 800w, /assets/gallery/ke-b777-2000.webp 2000w',
+    blurDataUrl:
+      'data:image/webp;base64,UklGRpAAAABXRUJQVlA4IIQAAABQBACdASoYABAAPtFUo0uoJKMhsAgBABoJagCdMoMYAElpjuvoBcBCApIAAP7owp9xDMocfxVPSm1kOrBKmeM6rG9XYcktpwe+vs/qz0GO+0Flb7ebB206U5dN9fctR/kz7lw1zxReGxfTn7nIkqvbzbYdLTsjVIKGLtgBhbVsudMAAAA=',
     archetype: 'twin-widebody',
     livery: {
       fuselage: '#1CA9E8',
@@ -68,12 +89,13 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
       variant: '777',
       pattern: 'korean',
     },
-    notes: 'Full gear-down final approach capture with GE90-115B nacelles catching crisp midday azimuth light.',
+    notes: 'Pendekatan akhir dengan roda pendaratan penuh dan nacelle GE90-115B menangkap cahaya siang yang tajam.',
   },
   {
     id: 'tniau-cn295',
     indexLabel: '02',
-    aircraft: 'CN-295 Military Transport',
+    category: 'pesawat',
+    aircraft: 'CN-295 Angkut Militer',
     operator: 'TNI AU Skadron Udara 2',
     registration: 'A-2903',
     year: '2026',
@@ -81,9 +103,13 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
     aperture: 'f/5.6',
     iso: '400',
     focalLength: '380mm',
-    location: 'HLP · Halim Perdanakusuma AFB',
-    liveryDesc: 'Camo Twin-Turboprop',
-    imageUrl: '/assets/aistudio/IMG_8475__2_.jpg_98b230ee.jpeg',
+    location: 'HLP · Lanud Halim Perdanakusuma',
+    liveryDesc: 'Kamuflase Twin-Turboprop',
+    imageUrl: '/assets/gallery/tniau-cn295-2000.webp',
+    thumbUrl: '/assets/gallery/tniau-cn295-800.webp',
+    srcSet: '/assets/gallery/tniau-cn295-800.webp 800w, /assets/gallery/tniau-cn295-2000.webp 2000w',
+    blurDataUrl:
+      'data:image/webp;base64,UklGRqYAAABXRUJQVlA4IJoAAACwBACdASoYABAAPtFWo0uoJKMhsAgBABoJZQDE6f/gPJQ5OCff1kzs/xTxDwoAAP7znlEQg154WUzmn7wZtAgrzXuaYaP7CtnO5s9l7gV+P7pVPqmVEa0bf8m3PTILHktD3ztUhyhUxmpvfBDFa360Fu6QNdefanbueMA51E0heqWfBMkVTewoJJRH0klv8KtwN9V7Hd1IAAAA',
     archetype: 'turboprop-camo',
     livery: {
       fuselage: '#465433',
@@ -98,11 +124,12 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
       variant: 'cn295',
       pattern: 'camo',
     },
-    notes: 'Tactical woodland camouflage CN-295 lifting off past the historic Skadron Udara 2 arched hangar apron.',
+    notes: 'CN-295 berkamuflase taktis lepas landas melewati hanggar lengkung bersejarah Skadron Udara 2.',
   },
   {
     id: 'ga-b777',
     indexLabel: '03',
+    category: 'pesawat',
     aircraft: 'Boeing 777-300ER',
     operator: 'Garuda Indonesia',
     registration: 'PK-GIG',
@@ -111,9 +138,13 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
     aperture: 'f/6.3',
     iso: '320',
     focalLength: '300mm',
-    location: 'CGK · Terminal 3 Apron',
-    liveryDesc: 'White/Turquoise Tail',
-    imageUrl: '/assets/aistudio/IMG_9512__2_.jpg_33ba273e.jpeg',
+    location: 'CGK · Apron Terminal 3',
+    liveryDesc: 'Putih / Ekor Toska',
+    imageUrl: '/assets/gallery/ga-b777-2000.webp',
+    thumbUrl: '/assets/gallery/ga-b777-800.webp',
+    srcSet: '/assets/gallery/ga-b777-800.webp 800w, /assets/gallery/ga-b777-2000.webp 2000w',
+    blurDataUrl:
+      'data:image/webp;base64,UklGRrAAAABXRUJQVlA4IKQAAAAwBACdASoYABAAPtFUo0uoJKMhsAgBABoJYwCdACHdftDrNNKfV0T40AAA/lvpgXTJIKBsebJBf0zWlcn+h4rUw1R5qdw8fSuY3ysl6DpALnaFkCThk9qAPRTBSpvwmhVr+Dt9wVmsNffds6KSV8nPkuYHt9zNN/Ir2xl8Un2yoWycnGB+j1I8THyHp2zfzZgrbbYPyINtk4F3Qh5hA4ccS6AAAA==',
     archetype: 'twin-widebody',
     livery: {
       fuselage: '#F8FAFC',
@@ -128,11 +159,12 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
       variant: '777',
       pattern: 'garuda',
     },
-    notes: 'Overcast blue-hour pushback framing the twin GE90 intake fans and SkyTeam nose heraldry.',
+    notes: 'Momen pushback di blue hour mendung menonjolkan bilah kipas GE90 dan emblem hidung SkyTeam.',
   },
   {
     id: 'ek-a380',
     indexLabel: '04',
+    category: 'pesawat',
     aircraft: 'Airbus A380-800',
     operator: 'Emirates',
     registration: 'A6-EOY',
@@ -142,8 +174,12 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
     iso: '250',
     focalLength: '450mm',
     location: 'DPS · Ngurah Rai RWY 09',
-    liveryDesc: 'White/Gold Quad-Engine',
-    imageUrl: '/assets/aistudio/IMG_5985__3_.jpg_07eb4fdd.jpeg',
+    liveryDesc: 'Putih / Emas Quad-Engine',
+    imageUrl: '/assets/gallery/ek-a380-2000.webp',
+    thumbUrl: '/assets/gallery/ek-a380-800.webp',
+    srcSet: '/assets/gallery/ek-a380-800.webp 800w, /assets/gallery/ek-a380-2000.webp 2000w',
+    blurDataUrl:
+      'data:image/webp;base64,UklGRrgAAABXRUJQVlA4IKwAAABQBACdASoYABAAPtFUo0uoJKMhsAgBABoJYwCdIE36gAcZZeCvE1bt9bgAAP5AZfCSeL3zIVuq6MkfOxJ3O9sZd9Xelb3So8v0vf1VFgcQ+rjI7IP150+RodQtR7ZFt2syCWSIEyA6N3YR7aC4wPiL98q/ABGbfEEuvfswYf06u/dmo2iNKCI+YyHyYD2p8TkXmTgSrYIGJkk97aR/NXrZi6kYj723ZKYkH1AABLUR',
     archetype: 'quad-a380',
     livery: {
       fuselage: '#F8FAFC',
@@ -158,11 +194,12 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
       variant: 'a380',
       pattern: 'emirates',
     },
-    notes: 'Double-deck superjumbo rolling out in warm tropical sunset rim light with UAE flag tail sweep.',
+    notes: 'Superjumbo dua dek meluncur di landasan berbalut cahaya rim senja tropis dengan ekor bendera UEA.',
   },
   {
     id: 'tg-a350',
     indexLabel: '05',
+    category: 'pesawat',
     aircraft: 'Airbus A350-900',
     operator: 'Thai Airways',
     registration: 'HS-THH',
@@ -172,8 +209,12 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
     iso: '400',
     focalLength: '400mm',
     location: 'DPS · Departure Climb',
-    liveryDesc: 'Purple/Gold Twin-Engine',
-    imageUrl: '/assets/aistudio/IMG_6028.jpg_94f0d5fb.jpeg',
+    liveryDesc: 'Ungu / Emas Twin-Engine',
+    imageUrl: '/assets/gallery/tg-a350-2000.webp',
+    thumbUrl: '/assets/gallery/tg-a350-800.webp',
+    srcSet: '/assets/gallery/tg-a350-800.webp 800w, /assets/gallery/tg-a350-2000.webp 2000w',
+    blurDataUrl:
+      'data:image/webp;base64,UklGRrIAAABXRUJQVlA4IKYAAAAwBACdASoYABAAPtFUo0uoJKMhsAgBABoJQBOgBA3nh8uqTgrvscu5PAAA9i0dYIMGTK22i/NyXigSgPNxKPwRqTpfg2S9PPBuJrImvdTiN5m0bRR/ZxMWXI9sKKYUpuK81RMUWom++rdz8gxVH80CKyC3joXI5hknp8HN5yRkZk/1NOXZeqaxhDqGMdO/V/DsPolkwjGmKQpoYrIfglkeDAa8AAAABLUR',
     archetype: 'twin-widebody',
     livery: {
       fuselage: '#F8FAFC',
@@ -188,11 +229,12 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
       variant: 'a350',
       pattern: 'thai',
     },
-    notes: 'Magenta twilight climb-out matching the orchid-purple tail fin and signature A350 curved sharklets.',
+    notes: 'Menanjak di langit senja magenta yang serasi dengan ekor ungu anggrek dan winglet lengkung khas A350.',
   },
   {
     id: 'nz-b787',
     indexLabel: '06',
+    category: 'pesawat',
     aircraft: 'Boeing 787-9 Dreamliner',
     operator: 'Air New Zealand',
     registration: 'ZK-NZG',
@@ -201,9 +243,13 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
     aperture: 'f/6.3',
     iso: '200',
     focalLength: '500mm',
-    location: 'DPS · Runway Holding Point',
-    liveryDesc: 'White/Black Tail',
-    imageUrl: '/assets/aistudio/IMG_6156.jpg_32977c48.jpeg',
+    location: 'DPS · Holding Point Landasan',
+    liveryDesc: 'Putih / Ekor Hitam',
+    imageUrl: '/assets/gallery/nz-b787-2000.webp',
+    thumbUrl: '/assets/gallery/nz-b787-800.webp',
+    srcSet: '/assets/gallery/nz-b787-800.webp 800w, /assets/gallery/nz-b787-2000.webp 2000w',
+    blurDataUrl:
+      'data:image/webp;base64,UklGRqQAAABXRUJQVlA4IJgAAACQBACdASoYABAAPtFUo0uoJKMhsAgBABoJZACdMoMYDBoDPCnlC/UKxtwObwAA/u3pW5fA3HU/8+bJPT4jKJs060ZyXIYTmYQPVi/tNXUCTBKlBNEZ/wQOXXB4ZHAP8MTG9J/hgcbLRdPspaUZ4DvQ0/6AmQOqqqaQrRlOYLx7QvBk9JFs7G/F1QKbKCBsgiotNw77Id/AAA==',
     archetype: 'twin-widebody',
     livery: {
       fuselage: '#F8FAFC',
@@ -218,11 +264,12 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
       variant: '787',
       pattern: 'anz',
     },
-    notes: 'Tight telephoto close-up highlighting the 787 serrated engine chevrons and four-pane composite flight deck.',
+    notes: 'Tangkapan telefoto rapat menonjolkan gerigi chevron mesin 787 dan empat kaca kokpit komposit.',
   },
   {
     id: 'clx-b747',
     indexLabel: '07',
+    category: 'pesawat',
     aircraft: 'Boeing 747-8F',
     operator: 'Cargolux',
     registration: 'LX-VCD',
@@ -231,9 +278,13 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
     aperture: 'f/5.6',
     iso: '320',
     focalLength: '420mm',
-    location: 'CGK · Golden Hour Taxiway',
-    liveryDesc: 'White/Red Quad-Engine',
-    imageUrl: '/assets/aistudio/IMG_9562.jpg_aa83052b.jpeg',
+    location: 'CGK · Taxiway Golden Hour',
+    liveryDesc: 'Putih / Merah Quad-Engine',
+    imageUrl: '/assets/gallery/clx-b747-2000.webp',
+    thumbUrl: '/assets/gallery/clx-b747-800.webp',
+    srcSet: '/assets/gallery/clx-b747-800.webp 800w, /assets/gallery/clx-b747-2000.webp 2000w',
+    blurDataUrl:
+      'data:image/webp;base64,UklGRrYAAABXRUJQVlA4IKoAAACwBACdASoYABAAPtFWpEuoJKOhsAgBABoJbACdMoHgA5+MB5CQ0DXXsy4KqJIAAP7Fz4L0Rz6nyr2qSBp9Rru3Hs0S4CAdDk5KbVxSbVpulhsluahUYD5Bey00GiyJ7r55IiW1pi2BlshhRwrkTqtkKBXoF85NyU59nnC98xnh5Qvgw+nE10AtgOjFZbvt85z4fhN1RmdR8KkdHykOaxw0Nsa6n4XROKTAAA==',
     archetype: 'quad-747',
     livery: {
       fuselage: '#F8FAFC',
@@ -248,11 +299,12 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
       variant: '747',
       pattern: 'cargolux',
     },
-    notes: 'Queen of the Skies freighter gliding past volcanic mountain silhouettes beneath an amber sunset sky.',
+    notes: 'Pesawat kargo Queen of the Skies meluncur melewati siluet pegunungan di bawah langit senja keemasan.',
   },
   {
     id: 'ey-mclaren',
     indexLabel: '08',
+    category: 'pesawat',
     aircraft: 'Boeing 787-9',
     operator: 'Etihad Airways McLaren Livery',
     registration: 'A6-BMI',
@@ -262,8 +314,12 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
     iso: '200',
     focalLength: '450mm',
     location: 'CGK · Clear Sky Final',
-    liveryDesc: 'Papaya Orange/Black',
-    imageUrl: '/assets/aistudio/IMG_1117__2_.jpg_e65e193b.jpeg',
+    liveryDesc: 'Oranye Papaya / Hitam',
+    imageUrl: '/assets/gallery/ey-mclaren-2000.webp',
+    thumbUrl: '/assets/gallery/ey-mclaren-800.webp',
+    srcSet: '/assets/gallery/ey-mclaren-800.webp 800w, /assets/gallery/ey-mclaren-2000.webp 2000w',
+    blurDataUrl:
+      'data:image/webp;base64,UklGRoQAAABXRUJQVlA4IHgAAABwBACdASoYABAAPtFUo0uoJKMhsAgBABoJbACdMoRwGQAAcaA2F2393l7NAAD+zTftR8pgjjpNO6CHse7x2+yB3iXZOS+tK+2pvCDNXh6t/WU7iA15S7a2TK8oYHKJiNkGg92frwscVwAUnFywSBHnLmfD6tzAAAA=',
     archetype: 'twin-widebody',
     livery: {
       fuselage: '#FF8000',
@@ -278,11 +334,12 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
       variant: '787',
       pattern: 'mclaren',
     },
-    notes: 'Special Formula 1 McLaren Racing papaya-orange and carbon-black faceted tail livery on clean final.',
+    notes: 'Livery khusus Formula 1 McLaren Racing berwarna oranye papaya dan karbon hitam saat final approach cerah.',
   },
   {
     id: 'ga-retro',
     indexLabel: '09',
+    category: 'pesawat',
     aircraft: 'Airbus A330-300',
     operator: 'Garuda Indonesia Retro Livery',
     registration: 'PK-GHG',
@@ -291,9 +348,13 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
     aperture: 'f/5.6',
     iso: '250',
     focalLength: '420mm',
-    location: 'CGK · Storm Cloud Approach',
-    liveryDesc: 'Classic Red/White',
-    imageUrl: '/assets/aistudio/IMG_1105.jpg_a152ed8c.jpeg',
+    location: 'CGK · Pendekatan Awan Badai',
+    liveryDesc: 'Klasik Merah / Putih',
+    imageUrl: '/assets/gallery/ga-retro-2000.webp',
+    thumbUrl: '/assets/gallery/ga-retro-800.webp',
+    srcSet: '/assets/gallery/ga-retro-800.webp 800w, /assets/gallery/ga-retro-2000.webp 2000w',
+    blurDataUrl:
+      'data:image/webp;base64,UklGRngAAABXRUJQVlA4IGwAAADwAwCdASoYABAAPtFUo0uoJKMhsAgBABoJYwC06CHc78UR5SLOC+SgAP6wegxiJkddHNnwQGN6gS+VaW6fl0fV6OG5rtfrTrBu7vNR8+Pya9OLJ3jHG+yVRuaqEwqaC+hSVLFiCZIjZTHgAAA=',
     archetype: 'twin-widebody',
     livery: {
       fuselage: '#F8FAFC',
@@ -308,12 +369,13 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
       variant: 'a330',
       pattern: 'garuda-retro',
     },
-    notes: '1970s heritage red cheatline and classic geometric Garuda tail emblem framed against dramatic slate storm clouds.',
+    notes: 'Garis merah era 1970-an dan emblem ekor Garuda klasik dibingkai awan badai kelabu yang dramatis.',
   },
   {
     id: 'kai-cc206',
     indexLabel: '10',
-    aircraft: 'Locomotives CC 206',
+    category: 'kereta',
+    aircraft: 'Lokomotif CC 206',
     operator: 'KAI (Kereta Api Indonesia)',
     registration: 'CC 206 13 62',
     year: '2026',
@@ -321,10 +383,14 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
     aperture: 'f/5.6',
     iso: '320',
     focalLength: '300mm',
-    location: 'DAOP 1 · Golden Hour Mainline',
-    liveryDesc: 'KAI Red/White Diesel-Electric',
-    specialBadge: 'AffanzRailspotter Collaboration',
-    imageUrl: '/assets/aistudio/IMG_0710__2_.jpg_aed01d05.jpeg',
+    location: 'DAOP 1 · Jalur Utama Golden Hour',
+    liveryDesc: 'Diesel-Elektrik Merah / Putih KAI',
+    specialBadge: 'Kolaborasi AffanzRailspotter',
+    imageUrl: '/assets/gallery/kai-cc206-2000.webp',
+    thumbUrl: '/assets/gallery/kai-cc206-800.webp',
+    srcSet: '/assets/gallery/kai-cc206-800.webp 800w, /assets/gallery/kai-cc206-2000.webp 2000w',
+    blurDataUrl:
+      'data:image/webp;base64,UklGRrAAAABXRUJQVlA4IKQAAACwBACdASoYABAAPtFUo0uoJKMhsAgBABoJZgCdMoACtc75RYyTk5R5bcXVxW4AAP7zmwyu5NbcB3dZA2TPA/DqL4yfjikpXZsAlpACdmfZMVqJWn+fAb5T7+Cnu9kuAEseMC5S4/5hVV8Y1fZxjLE7Vx1jBIcbV4xcXWihZYiRvOUqMb26HA9k3cBFRP0GiEL1YOzuAlJfKM82/+iC4bgc9ScAAA==',
     archetype: 'locomotive-cc206',
     livery: {
       fuselage: '#C8232C',
@@ -339,7 +405,7 @@ export const PORTFOLIO_ITEMS: PortfolioItem[] = [
       variant: 'cc206',
       pattern: 'kai',
     },
-    notes: 'GE CM20EMP dual-cab diesel-electric locomotive hauling stainless passenger consist in golden-hour backlight.',
+    notes: 'Lokomotif diesel-elektrik kabin ganda GE CM20EMP menarik rangkaian penumpang stainless steel dalam cahaya senja.',
   },
 ];
 
@@ -352,52 +418,21 @@ export interface GearItem {
 
 export const GEAR_ITEMS: GearItem[] = [
   {
-    category: 'Primary Body',
+    category: 'Bodi Utama',
     name: 'Canon EOS R5',
-    spec: '45MP Full-Frame · 20 fps Electronic · Dual Pixel AF II',
-    role: 'High-resolution widebody close-ups & heavy crop versatility',
+    spec: '45MP Full-Frame · 20 fps Elektronik · Dual Pixel AF II',
+    role: 'Close-up widebody beresolusi tinggi & fleksibilitas crop tajam',
   },
   {
-    category: 'Secondary Body',
+    category: 'Bodi Sekunder',
     name: 'Canon EOS R7',
-    spec: '32.5MP APS-C · 1.6x Reach · 15 fps Mechanical',
-    role: 'Extended telephoto reach on runway centerline departures',
+    spec: '32.5MP APS-C · 1.6x Reach · 15 fps Mekanik',
+    role: 'Jangkauan telefoto ekstra saat pesawat menanjak dari sumbu landasan',
   },
   {
-    category: 'Primary Telephoto',
+    category: 'Telefoto Utama',
     name: 'RF 100-500mm f/4.5-7.1L IS USM',
     spec: '5-Stop Optical IS · Dual Nano USM · Weather Sealed',
-    role: 'Go-to tracking glass for fast final approaches and airshows',
+    role: 'Lensa andalan pelacakan final approach dan manuver udara',
   },
-  {
-    category: 'Super Telephoto',
-    name: 'Sigma 150-600mm f/5-6.3 DG OS HSM',
-    spec: 'Contemporary · 600mm Reach · Custom AF Limiter',
-    role: 'Nose-gear taxiway portraits and heat-haze compression shots',
-  },
-  {
-    category: 'Apron & Night',
-    name: 'RF 24-70mm f/2.8L IS USM',
-    spec: 'Constant f/2.8 · 0.21m Min Focus · L-Series Optics',
-    role: 'Ramp pushbacks, hangar wide shots, and golden-hour locomotives',
-  },
-  {
-    category: 'Field Support',
-    name: 'Uniden Bearcat & CFexpress Type B',
-    spec: 'VHF Airband 118–137 MHz · 1700 MB/s Sustained Write',
-    role: 'Real-time ATC runway assignment monitoring and burst capture',
-  },
-];
-
-export interface SpotterStat {
-  label: string;
-  value: string;
-  detail: string;
-}
-
-export const SPOTTER_SPECS: SpotterStat[] = [
-  { label: 'Curated Heavy Frames', value: '10', detail: 'Widebody jets, military airlift & mainline rail' },
-  { label: 'Primary Airfields', value: 'CGK · HLP · DPS', detail: 'Soekarno-Hatta, Halim AFB & Ngurah Rai' },
-  { label: 'Action Shutter Baseline', value: '1/2000s', detail: 'Motion-frozen turbine blades & touchdown smoke' },
-  { label: 'Archive Window', value: '2025 — 2026', detail: 'Active field seasons & special livery intercepts' },
 ];

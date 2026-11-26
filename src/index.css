@@ -3,69 +3,36 @@
 
 @theme {
   --font-display: "Big Shoulders Display", ui-sans-serif, sans-serif;
-  --font-sans: "Instrument Sans", ui-sans-serif, sans-serif;
-  --color-ember-300: #FF5A6E;
-  --color-ember-400: #EF233C;
-  --color-ember-500: #D90429;
+  --font-sans: "Inter", ui-sans-serif, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 :root {
-  /* 1 Warna Aksen: Merah Bara (#EF233C) di atas hitam obsidian hangat (#080507) */
-  --accent: #EF233C;
-  --accent-bright: #FF5A6E;
-  --accent-amber: #FFB020; /* warna mata Belial & lampu landasan */
-  --accent-violet: #B55CFF; /* batu dada Belial, dipakai sangat jarang */
-  --accent-rgb: 239, 35, 60;
-
-  /* 5 Warna Netral (Kokpit & Landasan Malam) */
-  --neutral-950: #080507;
-  --neutral-900: #120A0D;
-  --neutral-800: #2B1218;
-  --neutral-400: #A8969B;
-  --neutral-100: #F6EEF0;
-
-  /* Skala Spasi 4/8px */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
-
-  /* Dua Nilai Radius */
-  --radius-sharp: 4px;
-  --radius-pill: 9999px;
-
-  /* Skala Tipografi (minimum 12px) */
-  --text-xs: 12px;
-  --text-sm: 14px;
-  --text-base: 16px;
-  --text-lg: 20px;
-  --text-xl: 28px;
-  --text-hero: clamp(40px, 5.4vw, 68px);
-
-  /* Kurva Gerak Kokpit */
-  --ease-cockpit: cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-html[data-mood="belial"] {
-  --accent-bright: #FF7A8A;
+  --navy-base: #0A0F1F;
+  --navy-panel: #121A33;
+  --blue-accent: #2F5BEA;
+  --text-primary: #F5F7FF;
+  --text-muted: #98A5C8;
+  --transform-yellow: #FFD23F;
+  --transform-purple: #A855F7;
 }
 
 @layer base {
-  html,
+  html {
+    background-color: var(--navy-base);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    scroll-behavior: auto;
+  }
+
   body,
   #root {
-    width: 100%;
-    height: 100%;
+    min-height: 100%;
     margin: 0;
     padding: 0;
-    background-color: var(--neutral-950);
-    color: var(--neutral-100);
-    font-family: var(--font-sans);
-    font-size: var(--text-base);
-    overflow: hidden;
+    background-color: var(--navy-base);
+    color: var(--text-primary);
+    overflow-x: hidden;
   }
 
   * {
@@ -73,104 +40,140 @@ html[data-mood="belial"] {
   }
 }
 
-/* Grain sensor tipis dan vignette kokpit */
-.cockpit-vignette {
-  background: radial-gradient(
-    ellipse 78% 72% at 50% 48%,
-    rgba(8, 5, 7, 0) 46%,
-    rgba(8, 5, 7, 0.56) 100%
-  );
+/* Lenis smooth scroll base */
+html.lenis,
+html.lenis body {
+  height: auto;
 }
 
-.sensor-grain {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.65'/%3E%3C/svg%3E");
-  opacity: 0.032;
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
 }
 
-@keyframes belialEmberShimmer {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scaleY(1);
-    opacity: 0.78;
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+
+/* Custom cursor hanya aktif di perangkat dengan pointer halus */
+@media (pointer: fine) {
+  body.has-custom-cursor,
+  body.has-custom-cursor * {
+    cursor: none !important;
+  }
+}
+
+/* Cahaya matahari terbit berdenyut pelan di belakang puncak gunung */
+@keyframes sunrisePulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(0.96);
+    opacity: 0.68;
   }
   50% {
-    transform: translate3d(0, -3px, 0) scaleY(1.03);
-    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 0.92;
   }
 }
 
-.belial-ember-wave {
-  animation: belialEmberShimmer 2.4s ease-in-out infinite;
+.sunrise-glow {
+  animation: sunrisePulse 5.2s ease-in-out infinite;
 }
 
-/* Penanda yang meluncur turun di rel petunjuk gulir */
-@keyframes scrollTick {
-  0% { transform: translate3d(0, -100%, 0); opacity: 0; }
-  25% { opacity: 1; }
-  100% { transform: translate3d(0, 360%, 0); opacity: 0; }
+/* Efek transformasi penuh: mata kuning & inti dada ungu */
+@keyframes transformEyeGlow {
+  0%, 100% {
+    opacity: 0.78;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.12);
+  }
 }
 
-.scroll-tick {
-  animation: scrollTick 1.7s var(--ease-cockpit) infinite;
+@keyframes transformCorePulse {
+  0%, 100% {
+    opacity: 0.76;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.22);
+  }
 }
 
-/* Cahaya mata (amber) dan batu dada (ungu) Belial yang berdenyut pelan */
-@keyframes belialEyePulse {
-  0%, 100% { filter: brightness(0.85); }
-  50% { filter: brightness(1.35); }
+@keyframes heroShake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  18% { transform: translate3d(-5px, 3px, 0); }
+  36% { transform: translate3d(5px, -4px, 0); }
+  54% { transform: translate3d(-4px, -2px, 0); }
+  72% { transform: translate3d(4px, 3px, 0); }
+  90% { transform: translate3d(-2px, 1px, 0); }
 }
 
-@keyframes belialOrbPulse {
-  0%, 100% { transform: scale(0.9); }
-  50% { transform: scale(1.18); }
+.transform-eye-glow {
+  animation: transformEyeGlow 2.1s ease-in-out infinite;
 }
 
-.belial-eye-pulse {
-  animation: belialEyePulse 2.6s ease-in-out infinite;
+.transform-core-pulse {
+  animation: transformCorePulse 1.6s ease-in-out infinite;
 }
 
-.belial-orb-pulse {
-  animation: belialOrbPulse 1.9s ease-in-out infinite;
+.transform-shake {
+  animation: heroShake 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* Scrollbar halus untuk modal */
+/* Topografi kontur bergerak pelan di section Tentang */
+@keyframes topoDrift {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-1.5%, -1%, 0) scale(1.02);
+  }
+}
+
+.topo-drift {
+  animation: topoDrift 26s ease-in-out infinite;
+}
+
+/* Scrollbar halus bernuansa navy */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--neutral-950);
+  background: #0A0F1F;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(var(--accent-rgb), 0.28);
-  border-radius: var(--radius-sharp);
+  background: rgba(47, 91, 234, 0.35);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--accent-rgb), 0.5);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-  }
-  .belial-ember-wave,
-  .scroll-tick,
-  .belial-eye-pulse,
-  .belial-orb-pulse {
-    animation: none !important;
-  }
+  background: rgba(47, 91, 234, 0.65);
 }
 
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .sunrise-glow,
+  .transform-eye-glow,
+  .transform-core-pulse,
+  .transform-shake,
+  .topo-drift {
+    animation: none !important;
+  }
+}
